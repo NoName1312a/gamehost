@@ -26,7 +26,16 @@ func Load() Config {
 		Addr:         envOr("GAMEHOST_ADDR", "127.0.0.1:8723"),
 		TemplatesDir: envOr("GAMEHOST_TEMPLATES", defaultTemplatesDir()),
 		DataDir:      envOr("GAMEHOST_DATA", defaultDataDir()),
-		AllowOrigins: []string{"http://localhost:5173", "http://127.0.0.1:5173"},
+		AllowOrigins: []string{
+			// Vite dev server (browser dev + `tauri dev`).
+			"http://localhost:5173",
+			"http://127.0.0.1:5173",
+			// Tauri desktop webview custom protocol. Windows serves the bundled
+			// app from http(s)://tauri.localhost; macOS/Linux use tauri://localhost.
+			"http://tauri.localhost",
+			"https://tauri.localhost",
+			"tauri://localhost",
+		},
 	}
 }
 

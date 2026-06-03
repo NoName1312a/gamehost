@@ -12,7 +12,7 @@ most important decision: it lets the *same* engine power both the desktop app
 (now) and a home-server / VPS deployment (later) with no rewrite.
 
 ```
-┌─ Desktop app (Tauri shell, later) ───────────────────────┐
+┌─ Desktop app (Tauri shell — Windows) ────────────────────┐
 │                                                            │
 │   UI (React)  ──HTTP + WebSocket──►  Engine (Go daemon)    │
 │      ▲                                    │                │
@@ -37,10 +37,16 @@ most important decision: it lets the *same* engine power both the desktop app
 - Pure client of the Engine's API. No game logic lives here.
 - Same bundle served by the desktop shell and by the headless server.
 
-### Desktop shell (`desktop/`, Tauri — added at M5)
-- Thin Rust wrapper that bundles the Engine binary + UI assets, launches the
-  Engine on a loopback port, and points a native webview at it.
-- Tauri over Electron: far smaller installers, native webview.
+### Desktop shell (`desktop/`, Tauri v2 — **Windows, implemented**)
+- Thin Rust wrapper that bundles the Engine binary as a **sidecar** plus the UI
+  assets, spawns the Engine on loopback (`127.0.0.1:8723`), and points a native
+  WebView2 window at it. Kills the Engine on exit; single-instance launch.
+- **Windows-only by design.** Linux/Mac users are served by the headless build
+  (the *same* Engine + UI over the web), so nothing here is platform-locked.
+- Tauri over Electron: far smaller installers (NSIS `.exe`), native webview.
+- Build: `scripts/desktop-build.ps1` → `desktop/target/release/bundle/nsis/`.
+  The bundled templates are staged into `desktop/resources/`; the engine
+  sidecar into `desktop/binaries/` (both git-ignored, regenerated each build).
 
 ## Why Docker-per-game
 One container per server gives isolation, per-server CPU/RAM limits, clean
@@ -73,7 +79,7 @@ Three runtime patterns cover most games:
 - **M2** Template registry → Bedrock + Valheim + one SteamCMD game; resource limits.
 - **M3** File manager, backups, scheduled tasks, settings editor.
 - **M4** Networking: UPnP auto-forward + relay fallback.
-- **M5** Polish, Tauri packaging/installer, headless server-mode build.
+- **M5** Tauri desktop packaging/installer (Windows) ✅; polish + headless server-mode build still open.
 
 ## API (M0)
 | Method | Path                   | Purpose                          |

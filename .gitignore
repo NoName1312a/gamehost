@@ -20,5 +20,8 @@ data/
 .DS_Store
 Thumbs.db
 
-# Tauri (later)
+# Tauri desktop shell
 desktop/target/
+desktop/binaries/
+desktop/resources/
+desktop/gen/

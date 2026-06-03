@@ -7,15 +7,17 @@ GameHost runs each game server in its own Docker container, driven by a small
 Go **engine** daemon and a React **control panel**. It ships first as a desktop
 app; the same engine later runs headless on a home server or VPS — no rewrite.
 
-> Status: **M1** — create/start/stop/delete servers with a live console.
-> Lifecycle is driven via the Docker CLI for now (the Docker Go SDK is mid
-> module-split); the runtime is abstracted so the SDK can drop in later.
+> Status: **M1 + Windows desktop app** — create/start/stop/delete servers with a
+> live console, now packaged as a one-click Windows app (Tauri) that auto-launches
+> the engine. Lifecycle is driven via the Docker CLI for now (the Docker Go SDK is
+> mid module-split); the runtime is abstracted so the SDK can drop in later.
 > See [`docs/architecture.md`](docs/architecture.md).
 
 ## Repo layout
 ```
 engine/      Go daemon — Docker control, REST + WebSocket API
 ui/          React + Vite + Tailwind control panel
+desktop/     Tauri v2 shell (Windows) — bundles + launches the engine
 templates/   Game definitions (one YAML per game)
 docs/        Design docs
 ```
@@ -48,6 +50,27 @@ npm run dev
 Open the UI. With no Docker yet you'll see the **setup banner** — that's the
 expected non-technical-user path; server creation arrives in M1.
 
+## Desktop app (Windows)
+The desktop shell wraps the UI in a native window and **auto-launches the engine**
+as a bundled sidecar — no terminal, no separate engine/UI startup.
+
+**One-time prereqs:** [Rust](https://rustup.rs) (MSVC toolchain), the
+**VS 2022 C++ Build Tools** (`winget install -e --id Microsoft.VisualStudio.2022.BuildTools
+--override "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"`),
+plus Go and Node. WebView2 ships with Windows 10/11.
+
+```powershell
+# Dev — hot-reload window + engine sidecar:
+powershell -ExecutionPolicy Bypass -File scripts\desktop-dev.ps1
+
+# Build the installer:
+powershell -ExecutionPolicy Bypass -File scripts\desktop-build.ps1
+# → desktop\target\release\bundle\nsis\GameHost_<version>_x64-setup.exe
+```
+
+> Docker is still required to actually run game servers (below). A guided
+> in-app setup wizard for that is the next milestone.
+
 ## Enabling Docker (to run game servers)
 Windows (run an **Administrator** PowerShell):
 ```powershell
@@ -62,4 +85,4 @@ Launch Docker Desktop once after install, then restart the engine.
 - [ ] **M2** Expand the game library (more templates); first-run image-pull progress
 - [ ] **M3** Files, backups, schedules, settings
 - [ ] **M4** Networking: UPnP auto-forward + relay fallback
-- [ ] **M5** Tauri desktop packaging; headless server build
+- [~] **M5** Tauri desktop packaging (Windows ✅); headless server build still open

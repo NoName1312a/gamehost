@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Core window permissions plus permission to spawn the bundled engine sidecar.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [{ "name": "engine", "sidecar": true }]
+    },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [{ "name": "engine", "sidecar": true }]
+    }
+  ]
+}
