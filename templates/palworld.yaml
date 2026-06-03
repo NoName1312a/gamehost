@@ -1,0 +1,50 @@
+id: palworld
+name: Palworld
+game: palworld
+category: Survival
+description: >-
+  Dedicated server for Palworld. SteamCMD-based; supports up to 32 players.
+  Tip: Palworld is memory-hungry — 8 GB+ is recommended.
+icon: palworld
+image: thijsvanloef/palworld-server-docker:latest
+runtime: steamcmd
+stopCommand: ""
+dataPath: /palworld
+commandMethod: none
+minMemoryMB: 4096
+recMemoryMB: 8192
+ports:
+  - name: game
+    container: 8211
+    protocol: udp
+    default: 8211
+  - name: query
+    container: 27015
+    protocol: udp
+    default: 27015
+env:
+  PORT: "8211"
+  MULTITHREADING: "true"
+  COMMUNITY: "false"
+variables:
+  - key: SERVER_NAME
+    label: Server Name
+    default: GameHost Palworld
+    type: string
+    required: true
+  - key: SERVER_PASSWORD
+    label: Server Password
+    description: Leave blank for an open server
+    default: ""
+    type: string
+    required: false
+  - key: ADMIN_PASSWORD
+    label: Admin Password
+    default: changeme
+    type: string
+    required: true
+  - key: PLAYERS
+    label: Max Players
+    default: "16"
+    type: int
+    required: true

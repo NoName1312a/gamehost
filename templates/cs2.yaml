@@ -1,0 +1,49 @@
+id: cs2
+name: Counter-Strike 2
+game: cs2
+category: Shooter
+description: >-
+  Counter-Strike 2 dedicated server (SteamCMD). For a public, internet-listed
+  server you'll need a free Game Server Login Token (GSLT) from Steam.
+icon: cs2
+image: joedwards32/cs2:latest
+runtime: steamcmd
+stopCommand: ""
+dataPath: /home/steam/cs2-dedicated
+commandMethod: none
+minMemoryMB: 2048
+recMemoryMB: 4096
+ports:
+  - name: game
+    container: 27015
+    protocol: udp
+    default: 27015
+  - name: game-tcp
+    container: 27015
+    protocol: tcp
+    default: 27015
+env:
+  CS2_PORT: "27015"
+variables:
+  - key: CS2_SERVERNAME
+    label: Server Name
+    default: GameHost CS2
+    type: string
+    required: true
+  - key: SRCDS_TOKEN
+    label: Game Server Login Token (GSLT)
+    description: From steamcommunity.com/dev/managegameservers — optional for LAN
+    default: ""
+    type: string
+    required: false
+  - key: CS2_MAXPLAYERS
+    label: Max Players
+    default: "10"
+    type: int
+    required: true
+  - key: CS2_PW
+    label: Server Password
+    description: Leave blank for an open server
+    default: ""
+    type: string
+    required: false
