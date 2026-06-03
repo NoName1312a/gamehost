@@ -15,6 +15,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/api"
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
+	"github.com/leop1/gamehost/engine/internal/network"
 	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
@@ -25,6 +26,7 @@ func main() {
 	cfg := config.Load()
 
 	rt := docker.New()
+	netMapper := network.New()
 
 	reg := templates.NewRegistry(cfg.TemplatesDir)
 	if err := reg.Load(); err != nil {
@@ -34,7 +36,7 @@ func main() {
 		slog.Info("loaded game templates", "count", len(reg.List()), "dir", cfg.TemplatesDir)
 	}
 
-	mgr, err := server.NewManager(cfg.DataDir, rt, reg)
+	mgr, err := server.NewManager(cfg.DataDir, rt, netMapper, reg)
 	if err != nil {
 		slog.Error("failed to initialize server manager", "err", err)
 		os.Exit(1)
@@ -42,7 +44,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.NewRouter(cfg, rt, reg, mgr),
+		Handler:           api.NewRouter(cfg, rt, reg, mgr, netMapper),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -61,6 +63,8 @@ func main() {
 	slog.Info("shutting down")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	// Remove any UPnP port mappings so they don't linger on the router.
+	netMapper.UnmapAll(ctx)
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("graceful shutdown failed", "err", err)
 	}

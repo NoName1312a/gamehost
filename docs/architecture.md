@@ -75,15 +75,18 @@ Three runtime patterns cover most games:
    abstracts the runtime so we can later bundle a minimal engine instead of
    requiring Docker Desktop.
 2. **Networking** — port-forwarding is the #1 blocker for "my friends can't
-   connect." Plan: automatic UPnP port-mapping + a built-in relay/tunnel
-   fallback so it works with zero router config.
+   connect." **Implemented:** automatic **UPnP** port-mapping (`engine/internal/network`)
+   opens each server's port on the router on start and closes it on stop; the UI
+   shows the public `host:port` to share. When the router has no/disabled UPnP it
+   degrades to manual-forward guidance. **Still future:** a built-in relay/tunnel
+   fallback for CGNAT / UPnP-off networks (needs hosted relay infrastructure).
 
 ## Roadmap
 - **M0** Monorepo scaffold; UI ↔ Engine; Docker probe + setup-wizard surface. ← *here*
 - **M1** Create/start/stop/delete a Paper server; live console + command input.
 - **M2** Template registry → Bedrock + Valheim + one SteamCMD game; resource limits.
 - **M3** File manager, backups, scheduled tasks, settings editor.
-- **M4** Networking: UPnP auto-forward + relay fallback.
+- **M4** Networking: UPnP auto-forward ✅ + connect address in UI; relay fallback still future.
 - **M5** Tauri desktop packaging/installer (Windows) ✅; polish + headless server-mode build still open.
 
 ## API (M0)
@@ -93,5 +96,6 @@ Three runtime patterns cover most games:
 | GET    | `/api/system/runtime`  | Docker connectivity (drives banner) |
 | GET    | `/api/system/setup`    | Setup-wizard prerequisite steps  |
 | POST   | `/api/system/setup/{step}` | Run a one-click setup fix (Windows) |
+| GET    | `/api/system/network`  | UPnP availability + public IP    |
 | GET    | `/api/templates`       | List game templates              |
 | GET    | `/api/templates/{id}`  | Single template                  |

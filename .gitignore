@@ -25,3 +25,6 @@ desktop/target/
 desktop/binaries/
 desktop/resources/
 desktop/gen/
+
+# Local planning/agent artifacts
+.claude/

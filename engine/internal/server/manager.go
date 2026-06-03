@@ -9,9 +9,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -47,6 +49,11 @@ type ServerView struct {
 	*Server
 	Status  string `json:"status"`
 	Running bool   `json:"running"`
+	// ExternalAddress is the public "host:port" friends connect to, when the
+	// public IP is known (UPnP discovered). Shared is true when the primary
+	// port is currently forwarded on the router.
+	ExternalAddress string `json:"externalAddress,omitempty"`
+	Shared          bool   `json:"shared"`
 }
 
 // CreateRequest is the payload to create a new server.
@@ -70,23 +77,36 @@ type Runtime interface {
 	Inspect(ctx context.Context, name string) docker.State
 }
 
+// Networking is the subset of the UPnP port mapper the manager needs.
+// *network.Mapper implements it. It's optional (may be nil) and every call is
+// best-effort — a server never fails to start because forwarding failed.
+type Networking interface {
+	Map(ctx context.Context, port int, proto, desc string) error
+	Unmap(ctx context.Context, port int, proto string) error
+	ExternalIP() string
+	IsMapped(port int, proto string) bool
+}
+
 // Manager is a concurrency-safe store of servers backed by a JSON file.
 type Manager struct {
 	mu    sync.RWMutex
 	path  string
 	rt    Runtime
+	net   Networking // optional; nil disables auto port-forwarding
 	reg   *templates.Registry
 	items map[string]*Server
 }
 
-// NewManager creates the data dir, loads existing servers, and returns a Manager.
-func NewManager(dataDir string, rt Runtime, reg *templates.Registry) (*Manager, error) {
+// NewManager creates the data dir, loads existing servers, and returns a
+// Manager. net may be nil to disable UPnP auto-forwarding.
+func NewManager(dataDir string, rt Runtime, net Networking, reg *templates.Registry) (*Manager, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
 	m := &Manager{
 		path:  filepath.Join(dataDir, "servers.json"),
 		rt:    rt,
+		net:   net,
 		reg:   reg,
 		items: map[string]*Server{},
 	}
@@ -248,33 +268,44 @@ func (m *Manager) specFor(s *Server) docker.CreateSpec {
 }
 
 // Start launches the container (first time: docker run, which pulls the image)
-// or starts the existing stopped container.
+// or starts the existing stopped container, then opens its port(s) on the
+// router via UPnP (best-effort).
 func (m *Manager) Start(ctx context.Context, id string) error {
 	s, ok := m.Get(id)
 	if !ok {
 		return fmt.Errorf("server not found")
 	}
+	var err error
 	if m.rt.Inspect(ctx, s.ContainerName()).Exists {
-		return m.rt.Start(ctx, s.ContainerName())
+		err = m.rt.Start(ctx, s.ContainerName())
+	} else {
+		err = m.rt.Run(ctx, m.specFor(s))
 	}
-	return m.rt.Run(ctx, m.specFor(s))
+	if err != nil {
+		return err
+	}
+	m.mapPorts(ctx, s)
+	return nil
 }
 
-// Stop stops the running container.
+// Stop stops the running container and closes its forwarded port(s).
 func (m *Manager) Stop(ctx context.Context, id string) error {
 	s, ok := m.Get(id)
 	if !ok {
 		return fmt.Errorf("server not found")
 	}
-	return m.rt.Stop(ctx, s.ContainerName())
+	err := m.rt.Stop(ctx, s.ContainerName())
+	m.unmapPorts(ctx, s)
+	return err
 }
 
-// Delete removes the container, its data volume, and the record.
+// Delete removes the container, its data volume, its port mappings, and the record.
 func (m *Manager) Delete(ctx context.Context, id string) error {
 	s, ok := m.Get(id)
 	if !ok {
 		return fmt.Errorf("server not found")
 	}
+	m.unmapPorts(ctx, s)
 	_ = m.rt.Remove(ctx, s.ContainerName())
 	_ = m.rt.RemoveVolume(ctx, s.VolumeName())
 
@@ -282,6 +313,28 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 	defer m.mu.Unlock()
 	delete(m.items, id)
 	return m.save()
+}
+
+// mapPorts forwards each of the server's ports on the router. Best-effort: a
+// missing/unsupported UPnP router is the common case and isn't an error.
+func (m *Manager) mapPorts(ctx context.Context, s *Server) {
+	if m.net == nil {
+		return
+	}
+	for _, p := range s.Ports {
+		if err := m.net.Map(ctx, p.Host, p.Protocol, "GameHost: "+s.Name); err != nil {
+			slog.Debug("upnp map failed", "server", s.Name, "port", p.Host, "err", err)
+		}
+	}
+}
+
+func (m *Manager) unmapPorts(ctx context.Context, s *Server) {
+	if m.net == nil {
+		return
+	}
+	for _, p := range s.Ports {
+		_ = m.net.Unmap(ctx, p.Host, p.Protocol)
+	}
 }
 
 // List returns all servers with their live runtime status.
@@ -302,7 +355,17 @@ func (m *Manager) List(ctx context.Context) []ServerView {
 		if st.Exists {
 			status = st.Status
 		}
-		views = append(views, ServerView{Server: s, Status: status, Running: st.Running})
+		view := ServerView{Server: s, Status: status, Running: st.Running}
+		// Surface connectivity for running servers once UPnP discovery has a
+		// public IP / port mapping.
+		if st.Running && m.net != nil && len(s.Ports) > 0 {
+			primary := s.Ports[0]
+			view.Shared = m.net.IsMapped(primary.Host, primary.Protocol)
+			if ip := m.net.ExternalIP(); ip != "" {
+				view.ExternalAddress = ip + ":" + strconv.Itoa(primary.Host)
+			}
+		}
+		views = append(views, view)
 	}
 	return views
 }

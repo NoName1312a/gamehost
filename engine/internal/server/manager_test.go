@@ -56,7 +56,7 @@ func newTestManager(t *testing.T) (*Manager, string) {
 		t.Fatalf("load templates: %v", err)
 	}
 	dataDir := t.TempDir()
-	m, err := NewManager(dataDir, &fakeRuntime{}, reg)
+	m, err := NewManager(dataDir, &fakeRuntime{}, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestPersistenceRoundTrip(t *testing.T) {
 
 	// A fresh manager over the same dir should load the server back.
 	reg := m.reg
-	m2, err := NewManager(dataDir, &fakeRuntime{state: docker.State{Exists: true, Status: "running", Running: true}}, reg)
+	m2, err := NewManager(dataDir, &fakeRuntime{state: docker.State{Exists: true, Status: "running", Running: true}}, nil, reg)
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}

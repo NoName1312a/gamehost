@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   api,
   type Health,
+  type Network,
   type Runtime,
   type Setup,
   type Template,
@@ -116,9 +117,64 @@ function ReadyBanner({ runtime }: { runtime: Async<Runtime> }) {
   );
 }
 
+function ShareLine({ s, upnpAvailable }: { s: ServerSummary; upnpAvailable: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const addr = s.externalAddress;
+  const port = s.ports?.[0]?.host;
+  const proto = (s.ports?.[0]?.protocol ?? "tcp").toUpperCase();
+
+  if (!addr) return null; // public IP not known yet
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(addr!);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-wide text-zinc-500">Friends connect to</p>
+          <code className="text-sm text-zinc-200">{addr}</code>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {s.shared ? (
+            <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] text-emerald-300 ring-1 ring-inset ring-emerald-400/20">
+              auto-forwarded
+            </span>
+          ) : (
+            <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-[11px] text-amber-300 ring-1 ring-inset ring-amber-400/20">
+              not forwarded
+            </span>
+          )}
+          <button
+            onClick={copy}
+            className="rounded border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-800"
+          >
+            {copied ? "copied" : "copy"}
+          </button>
+        </div>
+      </div>
+      {!s.shared && (
+        <p className="mt-1.5 text-[11px] text-zinc-500">
+          {upnpAvailable
+            ? "Couldn't auto-open this port — restart the server to retry, or forward it in your router."
+            : `Your router doesn't support auto-forwarding. Forward port ${port} (${proto}) to this PC in your router settings.`}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ServerCard({
   s,
   busy,
+  upnpAvailable,
   onStart,
   onStop,
   onDelete,
@@ -126,6 +182,7 @@ function ServerCard({
 }: {
   s: ServerSummary;
   busy?: string;
+  upnpAvailable: boolean;
   onStart: () => void;
   onStop: () => void;
   onDelete: () => void;
@@ -144,6 +201,8 @@ function ServerCard({
         </div>
         <Badge className={statusStyle(s.status)}>{busy ?? s.status}</Badge>
       </div>
+
+      {s.running && <ShareLine s={s} upnpAvailable={upnpAvailable} />}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {s.running ? (
@@ -197,6 +256,7 @@ export default function App() {
   const health = useAsync<Health>(api.health, nonce + tick);
   const runtime = useAsync<Runtime>(api.runtime, nonce + tick);
   const setup = useAsync<Setup>(api.setup, nonce + tick);
+  const network = useAsync<Network>(api.network, nonce + tick);
   const templates = useAsync<Template[]>(api.templates, nonce);
   const { servers, refresh } = useServers(health.status === "ok");
 
@@ -228,6 +288,7 @@ export default function App() {
 
   const version = health.status === "ok" ? health.data.version : undefined;
   const runtimeReady = runtime.status === "ok" && runtime.data.connected;
+  const upnpAvailable = network.status === "ok" && !!network.data.upnpAvailable;
 
   return (
     <div className="mx-auto min-h-screen max-w-6xl">
@@ -251,6 +312,7 @@ export default function App() {
                 key={s.id}
                 s={s}
                 busy={busy[s.id]}
+                upnpAvailable={upnpAvailable}
                 onStart={() => action(s.id, "starting…", () => api.startServer(s.id))}
                 onStop={() => action(s.id, "stopping…", () => api.stopServer(s.id))}
                 onDelete={() => {

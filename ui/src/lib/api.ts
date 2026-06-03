@@ -44,6 +44,12 @@ export interface SetupActionResult {
   hint: string;
 }
 
+export interface Network {
+  upnpAvailable: boolean;
+  externalIP?: string;
+  message: string;
+}
+
 export interface Port {
   name: string;
   container: number;
@@ -100,6 +106,9 @@ export interface ServerSummary {
   createdAt: string;
   status: string;
   running: boolean;
+  // Connectivity (populated for running servers once UPnP discovery resolves).
+  externalAddress?: string; // public "host:port" friends connect to
+  shared?: boolean; // port currently forwarded on the router
 }
 
 export interface CreateServerRequest {
@@ -144,6 +153,7 @@ export const api = {
   setup: () => get<Setup>("/api/system/setup"),
   // endpoint is the absolute API path from a SetupStep's action (e.g. /api/system/setup/start-docker).
   runSetupStep: (endpoint: string) => send<SetupActionResult>("POST", endpoint),
+  network: () => get<Network>("/api/system/network"),
   templates: () => get<Template[]>("/api/templates"),
   servers: () => get<ServerSummary[]>("/api/servers"),
   createServer: (req: CreateServerRequest) => send<ServerSummary>("POST", "/api/servers", req),

@@ -13,6 +13,7 @@ import (
 
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
+	"github.com/leop1/gamehost/engine/internal/network"
 	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
@@ -26,11 +27,12 @@ type API struct {
 	rt  *docker.Runtime
 	reg *templates.Registry
 	mgr *server.Manager
+	net *network.Mapper
 }
 
 // NewRouter wires up the HTTP routes and middleware.
-func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager) http.Handler {
-	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr}
+func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager, net *network.Mapper) http.Handler {
+	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr, net: net}
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -48,6 +50,7 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 		r.Get("/system/runtime", a.runtime)
 		r.Get("/system/setup", a.setupReport)
 		r.Post("/system/setup/{step}", a.runSetupStep)
+		r.Get("/system/network", a.networkStatus)
 
 		r.Get("/templates", a.listTemplates)
 		r.Get("/templates/{id}", a.getTemplate)
