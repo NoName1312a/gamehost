@@ -1,6 +1,6 @@
-// Package api exposes the engine's HTTP surface: a small REST API today, and
-// WebSocket console streams in later milestones. The browser UI (and, later,
-// the Tauri shell) is the only client.
+// Package api exposes the engine's HTTP surface: a REST API plus a WebSocket
+// console stream. The browser UI (and, later, the Tauri shell) is the only
+// client.
 package api
 
 import (
@@ -13,22 +13,24 @@ import (
 
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
+	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
 
 // Version is the engine API version, surfaced at /api/health.
-const Version = "0.0.1-m0"
+const Version = "0.1.0-m1"
 
 // API bundles the dependencies handlers need.
 type API struct {
 	cfg config.Config
 	rt  *docker.Runtime
 	reg *templates.Registry
+	mgr *server.Manager
 }
 
 // NewRouter wires up the HTTP routes and middleware.
-func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry) http.Handler {
-	a := &API{cfg: cfg, rt: rt, reg: reg}
+func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager) http.Handler {
+	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr}
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -44,8 +46,16 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry) h
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/health", a.health)
 		r.Get("/system/runtime", a.runtime)
+
 		r.Get("/templates", a.listTemplates)
 		r.Get("/templates/{id}", a.getTemplate)
+
+		r.Get("/servers", a.listServers)
+		r.Post("/servers", a.createServer)
+		r.Get("/servers/{id}/console", a.console) // WebSocket
+		r.Post("/servers/{id}/start", a.startServer)
+		r.Post("/servers/{id}/stop", a.stopServer)
+		r.Delete("/servers/{id}", a.deleteServer)
 	})
 
 	return r

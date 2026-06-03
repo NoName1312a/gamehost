@@ -7,8 +7,10 @@ GameHost runs each game server in its own Docker container, driven by a small
 Go **engine** daemon and a React **control panel**. It ships first as a desktop
 app; the same engine later runs headless on a home server or VPS — no rewrite.
 
-> Status: **M0** — scaffold. The panel boots and talks to the engine; creating
-> real servers lands in M1. See [`docs/architecture.md`](docs/architecture.md).
+> Status: **M1** — create/start/stop/delete servers with a live console.
+> Lifecycle is driven via the Docker CLI for now (the Docker Go SDK is mid
+> module-split); the runtime is abstracted so the SDK can drop in later.
+> See [`docs/architecture.md`](docs/architecture.md).
 
 ## Repo layout
 ```
@@ -53,8 +55,8 @@ Launch Docker Desktop once after install, then restart the engine.
 
 ## Roadmap
 - [x] **M0** Scaffold; UI ↔ engine; Docker probe + setup surface
-- [ ] **M1** Create/start/stop/delete a Paper server; live console
-- [ ] **M2** Bedrock + Valheim + a SteamCMD game; resource limits
+- [x] **M1** Create/start/stop/delete servers; live WebSocket console; per-server CPU/RAM limits
+- [ ] **M2** Expand the game library (more templates); first-run image-pull progress
 - [ ] **M3** Files, backups, schedules, settings
 - [ ] **M4** Networking: UPnP auto-forward + relay fallback
 - [ ] **M5** Tauri desktop packaging; headless server build

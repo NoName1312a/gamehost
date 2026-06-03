@@ -1,7 +1,8 @@
 // Typed client for the GameHost engine API.
-// In dev the engine listens on loopback; later the desktop shell will inject
-// the real address. Override here if you change GAMEHOST_ADDR.
+// In dev the engine listens on loopback; later the desktop shell injects the
+// real address.
 export const ENGINE_BASE = "http://127.0.0.1:8723";
+export const ENGINE_WS = "ws://127.0.0.1:8723";
 
 export interface Health {
   status: string;
@@ -12,7 +13,6 @@ export interface Health {
 export interface Runtime {
   connected: boolean;
   serverVersion?: string;
-  apiVersion?: string;
   message: string;
 }
 
@@ -43,6 +43,8 @@ export interface Template {
   image: string;
   runtime: string;
   stopCommand: string;
+  dataPath: string;
+  commandMethod: string;
   minMemoryMB: number;
   recMemoryMB: number;
   ports: Port[];
@@ -50,10 +52,61 @@ export interface Template {
   variables: Variable[];
 }
 
+export interface PortMapping {
+  host: number;
+  container: number;
+  protocol: string;
+}
+
+export interface ServerSummary {
+  id: string;
+  name: string;
+  templateId: string;
+  game: string;
+  image: string;
+  env: Record<string, string>;
+  ports: PortMapping[];
+  memoryMB: number;
+  dataPath: string;
+  commandMethod: string;
+  createdAt: string;
+  status: string;
+  running: boolean;
+}
+
+export interface CreateServerRequest {
+  templateId: string;
+  name: string;
+  memoryMB: number;
+  port: number;
+  variables: Record<string, string>;
+}
+
+async function parseError(res: Response, path: string): Promise<string> {
+  try {
+    const j = await res.json();
+    if (j && typeof j.error === "string") return j.error;
+  } catch {
+    /* not JSON */
+  }
+  return `Request to ${path} failed (${res.status})`;
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${ENGINE_BASE}${path}`);
-  if (!res.ok) throw new Error(`Request to ${path} failed (${res.status})`);
+  if (!res.ok) throw new Error(await parseError(res, path));
   return (await res.json()) as T;
+}
+
+async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${ENGINE_BASE}${path}`, {
+    method,
+    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(await parseError(res, path));
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
 }
 
 export const api = {
@@ -61,4 +114,10 @@ export const api = {
   health: () => get<Health>("/api/health"),
   runtime: () => get<Runtime>("/api/system/runtime"),
   templates: () => get<Template[]>("/api/templates"),
+  servers: () => get<ServerSummary[]>("/api/servers"),
+  createServer: (req: CreateServerRequest) => send<ServerSummary>("POST", "/api/servers", req),
+  startServer: (id: string) => send<{ status: string }>("POST", `/api/servers/${id}/start`),
+  stopServer: (id: string) => send<{ status: string }>("POST", `/api/servers/${id}/stop`),
+  deleteServer: (id: string) => send<{ status: string }>("DELETE", `/api/servers/${id}`),
+  consoleURL: (id: string) => `${ENGINE_WS}/api/servers/${id}/console`,
 };

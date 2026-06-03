@@ -9,6 +9,8 @@ icon: valheim
 image: lloesche/valheim-server:latest
 runtime: steamcmd
 stopCommand: ""
+dataPath: /config
+commandMethod: none
 minMemoryMB: 2048
 recMemoryMB: 4096
 ports:

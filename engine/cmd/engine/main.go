@@ -15,6 +15,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/api"
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
+	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
 
@@ -33,14 +34,20 @@ func main() {
 		slog.Info("loaded game templates", "count", len(reg.List()), "dir", cfg.TemplatesDir)
 	}
 
+	mgr, err := server.NewManager(cfg.DataDir, rt, reg)
+	if err != nil {
+		slog.Error("failed to initialize server manager", "err", err)
+		os.Exit(1)
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.NewRouter(cfg, rt, reg),
+		Handler:           api.NewRouter(cfg, rt, reg, mgr),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
-		slog.Info("engine listening", "addr", cfg.Addr)
+		slog.Info("engine listening", "addr", cfg.Addr, "data", cfg.DataDir)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("server error", "err", err)
 			os.Exit(1)

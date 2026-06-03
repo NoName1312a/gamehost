@@ -10,6 +10,8 @@ icon: minecraft
 image: itzg/minecraft-server:latest
 runtime: java
 stopCommand: stop
+dataPath: /data
+commandMethod: rcon-cli
 minMemoryMB: 1024
 recMemoryMB: 4096
 ports:

@@ -9,6 +9,8 @@ icon: minecraft
 image: itzg/minecraft-bedrock-server:latest
 runtime: custom
 stopCommand: stop
+dataPath: /data
+commandMethod: none
 minMemoryMB: 512
 recMemoryMB: 2048
 ports:

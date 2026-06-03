@@ -45,6 +45,8 @@ type Template struct {
 	Image       string            `yaml:"image" json:"image"`
 	Runtime     string            `yaml:"runtime" json:"runtime"` // java | steamcmd | custom
 	StopCommand string            `yaml:"stopCommand" json:"stopCommand"`
+	DataPath    string            `yaml:"dataPath" json:"dataPath"`           // in-container path to persist (volume mount)
+	CommandMethod string          `yaml:"commandMethod" json:"commandMethod"` // rcon-cli | stdin | none
 	MinMemoryMB int               `yaml:"minMemoryMB" json:"minMemoryMB"`
 	RecMemoryMB int               `yaml:"recMemoryMB" json:"recMemoryMB"`
 	Ports       []Port            `yaml:"ports" json:"ports"`
