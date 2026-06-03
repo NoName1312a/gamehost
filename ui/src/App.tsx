@@ -20,7 +20,8 @@ function useAsync<T>(fn: () => Promise<T>, nonce = 0): Async<T> {
   const [state, setState] = useState<Async<T>>({ status: "loading" });
   useEffect(() => {
     let alive = true;
-    setState({ status: "loading" });
+    // Note: we don't reset to "loading" on re-runs, so polling keeps the last
+    // known value on screen instead of flickering.
     fn()
       .then((data) => alive && setState({ status: "ok", data }))
       .catch((e: unknown) =>
@@ -201,10 +202,17 @@ function ServerCard({
 
 export default function App() {
   const [nonce, setNonce] = useState(0);
+  const [tick, setTick] = useState(0);
   const retry = () => setNonce((n) => n + 1);
 
-  const health = useAsync<Health>(api.health, nonce);
-  const runtime = useAsync<Runtime>(api.runtime, nonce);
+  // Poll engine + Docker status so the UI auto-updates when Docker comes online.
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 4000);
+    return () => clearInterval(t);
+  }, []);
+
+  const health = useAsync<Health>(api.health, nonce + tick);
+  const runtime = useAsync<Runtime>(api.runtime, nonce + tick);
   const templates = useAsync<Template[]>(api.templates, nonce);
   const { servers, refresh } = useServers(health.status === "ok");
 
