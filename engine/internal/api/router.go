@@ -14,6 +14,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
 	"github.com/leop1/gamehost/engine/internal/network"
+	"github.com/leop1/gamehost/engine/internal/relay"
 	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
@@ -23,16 +24,17 @@ const Version = "0.1.0-m1"
 
 // API bundles the dependencies handlers need.
 type API struct {
-	cfg config.Config
-	rt  *docker.Runtime
-	reg *templates.Registry
-	mgr *server.Manager
-	net *network.Mapper
+	cfg   config.Config
+	rt    *docker.Runtime
+	reg   *templates.Registry
+	mgr   *server.Manager
+	net   *network.Mapper
+	relay *relay.Agent
 }
 
 // NewRouter wires up the HTTP routes and middleware.
-func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager, net *network.Mapper) http.Handler {
-	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr, net: net}
+func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager, net *network.Mapper, rel *relay.Agent) http.Handler {
+	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr, net: net, relay: rel}
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -51,12 +53,15 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 		r.Get("/system/setup", a.setupReport)
 		r.Post("/system/setup/{step}", a.runSetupStep)
 		r.Get("/system/network", a.networkStatus)
+		r.Get("/system/relay", a.relayStatus)
+		r.Post("/system/relay/{action}", a.relayAction)
 
 		r.Get("/templates", a.listTemplates)
 		r.Get("/templates/{id}", a.getTemplate)
 
 		r.Get("/servers", a.listServers)
 		r.Post("/servers", a.createServer)
+		r.Put("/servers/{id}/relay-address", a.setRelayAddress)
 		r.Get("/servers/{id}/console", a.console) // WebSocket
 		r.Post("/servers/{id}/start", a.startServer)
 		r.Post("/servers/{id}/stop", a.stopServer)

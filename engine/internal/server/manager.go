@@ -36,6 +36,9 @@ type Server struct {
 	DataPath      string               `json:"dataPath"`
 	CommandMethod string               `json:"commandMethod"`
 	CreatedAt     string               `json:"createdAt"`
+	// RelayAddress is the public playit.gg address the user pasted back from
+	// the playit dashboard for sharing this server. Empty if not using a relay.
+	RelayAddress string `json:"relayAddress,omitempty"`
 }
 
 // ContainerName is the Docker container name for this server.
@@ -164,6 +167,18 @@ func (m *Manager) Get(id string) (*Server, bool) {
 	defer m.mu.RUnlock()
 	s, ok := m.items[id]
 	return s, ok
+}
+
+// SetRelayAddress stores the playit relay address the user shares for a server.
+func (m *Manager) SetRelayAddress(id, addr string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.items[id]
+	if !ok {
+		return fmt.Errorf("server not found")
+	}
+	s.RelayAddress = strings.TrimSpace(addr)
+	return m.save()
 }
 
 // Create validates the request against its template and persists a new server.

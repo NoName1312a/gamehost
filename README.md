@@ -89,5 +89,5 @@ Launch Docker Desktop once after install, then restart the engine.
 - [ ] **M2** Expand the game library (more templates); first-run image-pull progress
 - [ ] **M3** Files, backups, schedules, settings
 - [ ] **M4** Networking: UPnP auto-forward + relay fallback
-- [~] **M4** Networking: automatic **UPnP** port-forward + sharable connect address ✅; relay fallback still open
+- [~] **M4** Networking: automatic **UPnP** port-forward + sharable connect address ✅; **playit.gg relay** fallback for UPnP-off/CGNAT (guided setup) ✅; self-hosted relay still open
 - [~] **M5** Tauri desktop packaging (Windows ✅); headless server build still open

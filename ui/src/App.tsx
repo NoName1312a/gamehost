@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   api,
   type Health,
-  type Network,
+  type Relay,
   type Runtime,
   type Setup,
   type Template,
@@ -117,55 +117,166 @@ function ReadyBanner({ runtime }: { runtime: Async<Runtime> }) {
   );
 }
 
-function ShareLine({ s, upnpAvailable }: { s: ServerSummary; upnpAvailable: boolean }) {
+const primaryBtn =
+  "rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50";
+const ghostBtn =
+  "rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50";
+
+function CopyRow({ label, addr, pill }: { label: string; addr: string; pill: ReactNode }) {
   const [copied, setCopied] = useState(false);
-  const addr = s.externalAddress;
-  const port = s.ports?.[0]?.host;
-  const proto = (s.ports?.[0]?.protocol ?? "tcp").toUpperCase();
-
-  if (!addr) return null; // public IP not known yet
-
   async function copy() {
     try {
-      await navigator.clipboard.writeText(addr!);
+      await navigator.clipboard.writeText(addr);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
       /* clipboard unavailable */
     }
   }
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="min-w-0">
+        <p className="text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
+        <code className="text-sm text-zinc-200">{addr}</code>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {pill}
+        <button
+          onClick={copy}
+          className="rounded border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-800"
+        >
+          {copied ? "copied" : "copy"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const forwardedPill = (
+  <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] text-emerald-300 ring-1 ring-inset ring-emerald-400/20">
+    auto-forwarded
+  </span>
+);
+const relayPill = (
+  <span className="rounded-full bg-sky-400/10 px-2 py-0.5 text-[11px] text-sky-300 ring-1 ring-inset ring-sky-400/20">
+    via relay
+  </span>
+);
+
+// RelaySetup guides the playit relay fallback when a server isn't auto-forwarded:
+// install → link account → open dashboard to create a tunnel → paste the address.
+function RelaySetup({
+  s,
+  relay,
+  port,
+  proto,
+  onChanged,
+}: {
+  s: ServerSummary;
+  relay?: Relay;
+  port?: number;
+  proto: string;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [addr, setAddr] = useState("");
+
+  async function act(action: string) {
+    setBusy(true);
+    try {
+      await api.relayAction(action);
+    } catch {
+      /* surfaced via status re-poll */
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
+  }
+  async function save() {
+    if (!addr.trim()) return;
+    setBusy(true);
+    try {
+      await api.setRelayAddress(s.id, addr.trim());
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
+  }
 
   return (
-    <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-wide text-zinc-500">Friends connect to</p>
-          <code className="text-sm text-zinc-200">{addr}</code>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {s.shared ? (
-            <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] text-emerald-300 ring-1 ring-inset ring-emerald-400/20">
-              auto-forwarded
-            </span>
-          ) : (
-            <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-[11px] text-amber-300 ring-1 ring-inset ring-amber-400/20">
-              not forwarded
-            </span>
-          )}
-          <button
-            onClick={copy}
-            className="rounded border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-800"
-          >
-            {copied ? "copied" : "copy"}
+    <div className="space-y-2">
+      <p className="text-[11px] uppercase tracking-wide text-zinc-500">Share online (no port-forwarding)</p>
+      <p className="text-xs text-zinc-400">
+        This server isn't auto-forwarded. Use a free playit.gg relay so friends can connect without router setup
+        {port ? ` — or forward port ${port} (${proto}) in your router.` : "."}
+      </p>
+
+      {!relay?.installed && (
+        <button disabled={busy} onClick={() => act("install")} className={primaryBtn}>
+          {busy ? "Installing…" : "Install playit relay"}
+        </button>
+      )}
+
+      {relay?.installed && !relay.linked && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button disabled={busy} onClick={() => act("open-setup")} className={primaryBtn}>
+            Link playit account
           </button>
+          <span className="text-[11px] text-zinc-500">links in your browser, then it auto-detects</span>
         </div>
-      </div>
-      {!s.shared && (
-        <p className="mt-1.5 text-[11px] text-zinc-500">
-          {upnpAvailable
-            ? "Couldn't auto-open this port — restart the server to retry, or forward it in your router."
-            : `Your router doesn't support auto-forwarding. Forward port ${port} (${proto}) to this PC in your router settings.`}
-        </p>
+      )}
+
+      {relay?.installed && relay.linked && (
+        <div className="space-y-2">
+          <button disabled={busy} onClick={() => act("open-dashboard")} className={ghostBtn}>
+            Open playit dashboard → create a tunnel
+          </button>
+          <div className="flex gap-2">
+            <input
+              value={addr}
+              onChange={(e) => setAddr(e.target.value)}
+              placeholder="paste your playit address, e.g. name.playit.gg:35211"
+              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-emerald-500"
+            />
+            <button disabled={busy || !addr.trim()} onClick={save} className={primaryBtn}>
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ShareLine({ s, relay, onChanged }: { s: ServerSummary; relay?: Relay; onChanged: () => void }) {
+  const port = s.ports?.[0]?.host;
+  const proto = (s.ports?.[0]?.protocol ?? "tcp").toUpperCase();
+  const directOK = s.shared && !!s.externalAddress;
+
+  async function stopSharing() {
+    try {
+      await api.setRelayAddress(s.id, "");
+    } finally {
+      onChanged();
+    }
+  }
+
+  return (
+    <div className="mt-3 space-y-2 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+      {directOK ? (
+        <CopyRow label="Friends connect to" addr={s.externalAddress!} pill={forwardedPill} />
+      ) : s.relayAddress ? (
+        <>
+          <CopyRow label="Friends connect to" addr={s.relayAddress} pill={relayPill} />
+          <button
+            onClick={stopSharing}
+            className="text-[11px] text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+          >
+            change / stop sharing
+          </button>
+        </>
+      ) : (
+        <RelaySetup s={s} relay={relay} port={port} proto={proto} onChanged={onChanged} />
       )}
     </div>
   );
@@ -174,7 +285,8 @@ function ShareLine({ s, upnpAvailable }: { s: ServerSummary; upnpAvailable: bool
 function ServerCard({
   s,
   busy,
-  upnpAvailable,
+  relay,
+  onChanged,
   onStart,
   onStop,
   onDelete,
@@ -182,7 +294,8 @@ function ServerCard({
 }: {
   s: ServerSummary;
   busy?: string;
-  upnpAvailable: boolean;
+  relay?: Relay;
+  onChanged: () => void;
   onStart: () => void;
   onStop: () => void;
   onDelete: () => void;
@@ -202,7 +315,7 @@ function ServerCard({
         <Badge className={statusStyle(s.status)}>{busy ?? s.status}</Badge>
       </div>
 
-      {s.running && <ShareLine s={s} upnpAvailable={upnpAvailable} />}
+      {s.running && <ShareLine s={s} relay={relay} onChanged={onChanged} />}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {s.running ? (
@@ -256,7 +369,7 @@ export default function App() {
   const health = useAsync<Health>(api.health, nonce + tick);
   const runtime = useAsync<Runtime>(api.runtime, nonce + tick);
   const setup = useAsync<Setup>(api.setup, nonce + tick);
-  const network = useAsync<Network>(api.network, nonce + tick);
+  const relay = useAsync<Relay>(api.relay, nonce + tick);
   const templates = useAsync<Template[]>(api.templates, nonce);
   const { servers, refresh } = useServers(health.status === "ok");
 
@@ -288,7 +401,6 @@ export default function App() {
 
   const version = health.status === "ok" ? health.data.version : undefined;
   const runtimeReady = runtime.status === "ok" && runtime.data.connected;
-  const upnpAvailable = network.status === "ok" && !!network.data.upnpAvailable;
 
   return (
     <div className="mx-auto min-h-screen max-w-6xl">
@@ -312,7 +424,11 @@ export default function App() {
                 key={s.id}
                 s={s}
                 busy={busy[s.id]}
-                upnpAvailable={upnpAvailable}
+                relay={relay.status === "ok" ? relay.data : undefined}
+                onChanged={() => {
+                  refresh();
+                  retry();
+                }}
                 onStart={() => action(s.id, "starting…", () => api.startServer(s.id))}
                 onStop={() => action(s.id, "stopping…", () => api.stopServer(s.id))}
                 onDelete={() => {

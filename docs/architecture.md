@@ -78,8 +78,13 @@ Three runtime patterns cover most games:
    connect." **Implemented:** automatic **UPnP** port-mapping (`engine/internal/network`)
    opens each server's port on the router on start and closes it on stop; the UI
    shows the public `host:port` to share. When the router has no/disabled UPnP it
-   degrades to manual-forward guidance. **Still future:** a built-in relay/tunnel
-   fallback for CGNAT / UPnP-off networks (needs hosted relay infrastructure).
+   degrades to manual-forward guidance. **Relay fallback (UPnP-off / CGNAT):**
+   `engine/internal/relay` integrates **playit.gg** — it locates/installs the
+   agent (winget, user scope), supervises the daemon, and guides the one-time
+   account link + dashboard tunnel; each server stores the playit address to
+   share. (Thin by necessity: playit's scriptable CLI is Linux-only and its API
+   is undocumented, so tunnels are created on playit's dashboard.) A self-hosted
+   relay (own VPS) remains future.
 
 ## Roadmap
 - **M0** Monorepo scaffold; UI ↔ Engine; Docker probe + setup-wizard surface. ← *here*
@@ -97,5 +102,8 @@ Three runtime patterns cover most games:
 | GET    | `/api/system/setup`    | Setup-wizard prerequisite steps  |
 | POST   | `/api/system/setup/{step}` | Run a one-click setup fix (Windows) |
 | GET    | `/api/system/network`  | UPnP availability + public IP    |
+| GET    | `/api/system/relay`    | playit relay status (installed/linked) |
+| POST   | `/api/system/relay/{action}` | Relay action: install/start/stop/open-setup/open-dashboard |
+| PUT    | `/api/servers/{id}/relay-address` | Save a server's playit address |
 | GET    | `/api/templates`       | List game templates              |
 | GET    | `/api/templates/{id}`  | Single template                  |

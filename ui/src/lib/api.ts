@@ -50,6 +50,15 @@ export interface Network {
   message: string;
 }
 
+export interface Relay {
+  installed: boolean;
+  linked: boolean;
+  running: boolean;
+  setupUrl: string;
+  dashboardUrl: string;
+  message: string;
+}
+
 export interface Port {
   name: string;
   container: number;
@@ -109,6 +118,7 @@ export interface ServerSummary {
   // Connectivity (populated for running servers once UPnP discovery resolves).
   externalAddress?: string; // public "host:port" friends connect to
   shared?: boolean; // port currently forwarded on the router
+  relayAddress?: string; // playit relay address the user pasted back for sharing
 }
 
 export interface CreateServerRequest {
@@ -154,6 +164,10 @@ export const api = {
   // endpoint is the absolute API path from a SetupStep's action (e.g. /api/system/setup/start-docker).
   runSetupStep: (endpoint: string) => send<SetupActionResult>("POST", endpoint),
   network: () => get<Network>("/api/system/network"),
+  relay: () => get<Relay>("/api/system/relay"),
+  relayAction: (action: string) => send<{ status: string }>("POST", `/api/system/relay/${action}`),
+  setRelayAddress: (id: string, address: string) =>
+    send<{ status: string }>("PUT", `/api/servers/${id}/relay-address`, { address }),
   templates: () => get<Template[]>("/api/templates"),
   servers: () => get<ServerSummary[]>("/api/servers"),
   createServer: (req: CreateServerRequest) => send<ServerSummary>("POST", "/api/servers", req),

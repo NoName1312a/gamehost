@@ -16,6 +16,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
 	"github.com/leop1/gamehost/engine/internal/network"
+	"github.com/leop1/gamehost/engine/internal/relay"
 	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
@@ -27,6 +28,7 @@ func main() {
 
 	rt := docker.New()
 	netMapper := network.New()
+	relayAgent := relay.New()
 
 	reg := templates.NewRegistry(cfg.TemplatesDir)
 	if err := reg.Load(); err != nil {
@@ -44,9 +46,16 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.NewRouter(cfg, rt, reg, mgr, netMapper),
+		Handler:           api.NewRouter(cfg, rt, reg, mgr, netMapper, relayAgent),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+
+	// If playit is already linked, bring its tunnels up alongside the engine.
+	go func() {
+		if err := relayAgent.Start(); err != nil {
+			slog.Debug("playit relay not started", "err", err)
+		}
+	}()
 
 	go func() {
 		slog.Info("engine listening", "addr", cfg.Addr, "data", cfg.DataDir)
@@ -65,6 +74,7 @@ func main() {
 	defer cancel()
 	// Remove any UPnP port mappings so they don't linger on the router.
 	netMapper.UnmapAll(ctx)
+	relayAgent.Stop()
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("graceful shutdown failed", "err", err)
 	}
