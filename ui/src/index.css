@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #0a0a0b;
+  color: #e4e4e7;
+  -webkit-font-smoothing: antialiased;
+}

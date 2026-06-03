@@ -1,0 +1,44 @@
+id: minecraft-bedrock
+name: Minecraft (Bedrock)
+game: minecraft
+category: Sandbox
+description: >-
+  Bedrock Edition dedicated server for cross-play across Windows, mobile,
+  consoles, and the Pocket Edition.
+icon: minecraft
+image: itzg/minecraft-bedrock-server:latest
+runtime: custom
+stopCommand: stop
+minMemoryMB: 512
+recMemoryMB: 2048
+ports:
+  - name: game
+    container: 19132
+    protocol: udp
+    default: 19132
+env:
+  EULA: "TRUE"
+variables:
+  - key: VERSION
+    label: Version
+    description: Bedrock server version (LATEST or a specific build)
+    default: LATEST
+    type: string
+    required: true
+  - key: GAMEMODE
+    label: Game Mode
+    default: survival
+    type: enum
+    options: [survival, creative, adventure]
+    required: true
+  - key: DIFFICULTY
+    label: Difficulty
+    default: normal
+    type: enum
+    options: [peaceful, easy, normal, hard]
+    required: true
+  - key: SERVER_NAME
+    label: Server Name
+    default: GameHost Bedrock
+    type: string
+    required: false

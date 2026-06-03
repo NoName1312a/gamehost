@@ -1,0 +1,40 @@
+id: valheim
+name: Valheim
+game: valheim
+category: Survival
+description: >-
+  Dedicated server for Valheim (up to 10 players). Built on SteamCMD; requires a
+  server password of at least 5 characters.
+icon: valheim
+image: lloesche/valheim-server:latest
+runtime: steamcmd
+stopCommand: ""
+minMemoryMB: 2048
+recMemoryMB: 4096
+ports:
+  - name: game
+    container: 2456
+    protocol: udp
+    default: 2456
+  - name: query
+    container: 2457
+    protocol: udp
+    default: 2457
+env: {}
+variables:
+  - key: SERVER_NAME
+    label: Server Name
+    default: GameHost Valheim
+    type: string
+    required: true
+  - key: WORLD_NAME
+    label: World Name
+    default: Dedicated
+    type: string
+    required: true
+  - key: SERVER_PASS
+    label: Password
+    description: Minimum 5 characters — required by Valheim
+    default: changeme
+    type: string
+    required: true

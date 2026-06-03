@@ -1,0 +1,47 @@
+id: minecraft-java-paper
+name: Minecraft (Java • Paper)
+game: minecraft
+category: Sandbox
+description: >-
+  High-performance Paper server for Minecraft Java Edition. Supports plugins,
+  any version, and switching between Vanilla / Paper / Fabric / Forge via the
+  Server Type option.
+icon: minecraft
+image: itzg/minecraft-server:latest
+runtime: java
+stopCommand: stop
+minMemoryMB: 1024
+recMemoryMB: 4096
+ports:
+  - name: game
+    container: 25565
+    protocol: tcp
+    default: 25565
+env:
+  EULA: "TRUE"
+variables:
+  - key: VERSION
+    label: Minecraft Version
+    description: Server version, e.g. LATEST or 1.21.4
+    default: LATEST
+    type: string
+    required: true
+  - key: TYPE
+    label: Server Type
+    description: Server software / mod loader
+    default: PAPER
+    type: enum
+    options: [VANILLA, PAPER, PURPUR, FABRIC, FORGE, NEOFORGE, SPIGOT]
+    required: true
+  - key: MEMORY
+    label: Memory
+    description: JVM heap size, e.g. 2G or 4G
+    default: 2G
+    type: string
+    required: true
+  - key: MOTD
+    label: Server Message (MOTD)
+    description: Text shown in the multiplayer server list
+    default: A GameHost server
+    type: string
+    required: false

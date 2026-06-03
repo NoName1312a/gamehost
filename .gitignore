@@ -1,0 +1,24 @@
+# Node / UI
+node_modules/
+ui/dist/
+ui/.vite/
+*.local
+
+# Go / engine
+engine/engine
+engine/engine.exe
+/engine/bin/
+*.test
+
+# Engine runtime data
+data/
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Tauri (later)
+desktop/target/
