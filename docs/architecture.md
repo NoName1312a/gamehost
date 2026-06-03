@@ -67,8 +67,13 @@ Three runtime patterns cover most games:
 ## The two UX battlegrounds (our differentiators)
 1. **Install** — non-technical users fail at install. The desktop app + a
    guided **setup wizard** (detect → enable WSL2 → install/manage Docker) is the
-   answer. The engine abstracts the runtime so we can later bundle a minimal
-   engine instead of requiring Docker Desktop.
+   answer. **Implemented:** the engine exposes `GET /api/system/setup` (per-step
+   status) and `POST /api/system/setup/{step}` (one-click fixes that trigger a
+   UAC-elevated `wsl --install` / `winget install Docker.DockerDesktop`, or start
+   Docker); the UI renders these as a stepwise wizard. Windows-only fix actions
+   are guarded by `runtime.GOOS`, so the UI stays a pure engine client. The engine
+   abstracts the runtime so we can later bundle a minimal engine instead of
+   requiring Docker Desktop.
 2. **Networking** — port-forwarding is the #1 blocker for "my friends can't
    connect." Plan: automatic UPnP port-mapping + a built-in relay/tunnel
    fallback so it works with zero router config.
@@ -85,6 +90,8 @@ Three runtime patterns cover most games:
 | Method | Path                   | Purpose                          |
 |--------|------------------------|----------------------------------|
 | GET    | `/api/health`          | Engine liveness + version        |
-| GET    | `/api/system/runtime`  | Docker connectivity (drives wizard) |
+| GET    | `/api/system/runtime`  | Docker connectivity (drives banner) |
+| GET    | `/api/system/setup`    | Setup-wizard prerequisite steps  |
+| POST   | `/api/system/setup/{step}` | Run a one-click setup fix (Windows) |
 | GET    | `/api/templates`       | List game templates              |
 | GET    | `/api/templates/{id}`  | Single template                  |

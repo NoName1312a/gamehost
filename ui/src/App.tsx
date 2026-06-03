@@ -3,11 +3,13 @@ import {
   api,
   type Health,
   type Runtime,
+  type Setup,
   type Template,
   type ServerSummary,
 } from "./lib/api";
 import { CreateServerModal } from "./components/CreateServerModal";
 import { ServerConsole } from "./components/ServerConsole";
+import { SetupWizard } from "./components/SetupWizard";
 
 // ---- tiny async helper -----------------------------------------------------
 
@@ -99,36 +101,17 @@ function Header({ version }: { version?: string }) {
   );
 }
 
-function RuntimeBanner({ runtime }: { runtime: Async<Runtime> }) {
-  if (runtime.status === "loading") return null;
-  const connected = runtime.status === "ok" && runtime.data.connected;
-
-  if (connected) {
-    const d = (runtime as { data: Runtime }).data;
-    return (
-      <div className="mx-6 mt-6 flex items-center gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-        <span className="h-2 w-2 rounded-full bg-emerald-400" />
-        <p className="text-sm text-emerald-200">
-          Docker connected{d.serverVersion ? ` — engine v${d.serverVersion}` : ""}. You're ready to host.
-        </p>
-      </div>
-    );
-  }
-
+// ReadyBanner is shown once Docker is reachable; the guided SetupWizard handles
+// the not-yet-ready case.
+function ReadyBanner({ runtime }: { runtime: Async<Runtime> }) {
+  if (runtime.status !== "ok" || !runtime.data.connected) return null;
+  const { serverVersion } = runtime.data;
   return (
-    <div className="mx-6 mt-6 rounded-lg border border-amber-500/20 bg-amber-500/5 p-5">
-      <div className="flex items-center gap-3">
-        <span className="h-2 w-2 rounded-full bg-amber-400" />
-        <h2 className="text-sm font-semibold text-amber-100">Set up Docker to start hosting</h2>
-      </div>
-      <p className="mt-2 text-sm text-amber-200/80">
-        GameHost runs each game server in its own container. Docker isn't reachable yet — a one-time
-        setup. On Windows, in an <span className="font-semibold">Administrator</span> terminal:
+    <div className="mx-6 mt-6 flex items-center gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+      <span className="h-2 w-2 rounded-full bg-emerald-400" />
+      <p className="text-sm text-emerald-200">
+        Docker connected{serverVersion ? ` — engine v${serverVersion}` : ""}. You're ready to host.
       </p>
-      <pre className="mt-3 overflow-x-auto rounded-md bg-zinc-950/70 p-3 text-xs leading-relaxed text-zinc-300 ring-1 ring-zinc-800">
-{`wsl --install                                 # reboot if prompted
-winget install -e --id Docker.DockerDesktop   # then launch it once`}
-      </pre>
     </div>
   );
 }
@@ -213,6 +196,7 @@ export default function App() {
 
   const health = useAsync<Health>(api.health, nonce + tick);
   const runtime = useAsync<Runtime>(api.runtime, nonce + tick);
+  const setup = useAsync<Setup>(api.setup, nonce + tick);
   const templates = useAsync<Template[]>(api.templates, nonce);
   const { servers, refresh } = useServers(health.status === "ok");
 
@@ -248,7 +232,12 @@ export default function App() {
   return (
     <div className="mx-auto min-h-screen max-w-6xl">
       <Header version={version} />
-      <RuntimeBanner runtime={runtime} />
+      {runtime.status !== "loading" &&
+        (runtimeReady ? (
+          <ReadyBanner runtime={runtime} />
+        ) : (
+          <SetupWizard setup={setup} onRecheck={retry} />
+        ))}
 
       {/* Servers */}
       <section className="px-6 pt-8">

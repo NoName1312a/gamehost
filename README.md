@@ -72,7 +72,11 @@ powershell -ExecutionPolicy Bypass -File scripts\desktop-build.ps1
 > in-app setup wizard for that is the next milestone.
 
 ## Enabling Docker (to run game servers)
-Windows (run an **Administrator** PowerShell):
+**In the desktop app this is one-click:** when Docker isn't ready, GameHost shows
+a guided **setup wizard** that detects what's missing (WSL2 → Docker Desktop →
+start Docker) and fixes each step for you via a Windows prompt — no terminal.
+
+Prefer to do it by hand? Windows, in an **Administrator** PowerShell:
 ```powershell
 wsl --install                                  # reboot if prompted
 winget install -e --id Docker.DockerDesktop

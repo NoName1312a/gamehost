@@ -46,6 +46,8 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/health", a.health)
 		r.Get("/system/runtime", a.runtime)
+		r.Get("/system/setup", a.setupReport)
+		r.Post("/system/setup/{step}", a.runSetupStep)
 
 		r.Get("/templates", a.listTemplates)
 		r.Get("/templates/{id}", a.getTemplate)

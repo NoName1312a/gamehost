@@ -16,6 +16,34 @@ export interface Runtime {
   message: string;
 }
 
+export interface SetupAction {
+  label: string;
+  endpoint: string;
+  command: string;
+  needsAdmin: boolean;
+  needsReboot: boolean;
+}
+
+export interface SetupStep {
+  id: string;
+  title: string;
+  status: "ok" | "todo";
+  detail: string;
+  action?: SetupAction;
+}
+
+export interface Setup {
+  platform: string;
+  ready: boolean;
+  steps: SetupStep[];
+}
+
+export interface SetupActionResult {
+  started: boolean;
+  needsReboot?: boolean;
+  hint: string;
+}
+
 export interface Port {
   name: string;
   container: number;
@@ -113,6 +141,9 @@ export const api = {
   base: ENGINE_BASE,
   health: () => get<Health>("/api/health"),
   runtime: () => get<Runtime>("/api/system/runtime"),
+  setup: () => get<Setup>("/api/system/setup"),
+  // endpoint is the absolute API path from a SetupStep's action (e.g. /api/system/setup/start-docker).
+  runSetupStep: (endpoint: string) => send<SetupActionResult>("POST", endpoint),
   templates: () => get<Template[]>("/api/templates"),
   servers: () => get<ServerSummary[]>("/api/servers"),
   createServer: (req: CreateServerRequest) => send<ServerSummary>("POST", "/api/servers", req),
