@@ -18,7 +18,6 @@ func TestLocateViaEnv(t *testing.T) {
 		t.Fatalf("locate via env: got %q want %q", got, bin)
 	}
 
-	// A bogus override must not be returned (it doesn't exist).
 	bogus := filepath.Join(dir, "nope.exe")
 	t.Setenv("GAMEHOST_PLAYIT", bogus)
 	if locate() == bogus {
@@ -28,7 +27,7 @@ func TestLocateViaEnv(t *testing.T) {
 
 func TestStatusCarriesURLsAndMessage(t *testing.T) {
 	t.Setenv("GAMEHOST_PLAYIT", "")
-	st := New().Status()
+	st := New(t.TempDir()).Status()
 	if st.SetupURL == "" || st.DashboardURL == "" {
 		t.Fatal("status should carry setup + dashboard URLs")
 	}
@@ -38,13 +37,25 @@ func TestStatusCarriesURLsAndMessage(t *testing.T) {
 }
 
 func TestRunActionUnknown(t *testing.T) {
-	if err := New().RunAction(context.Background(), "bogus"); err == nil {
+	if err := New(t.TempDir()).RunAction(context.Background(), "bogus"); err == nil {
 		t.Fatal("expected error for unknown relay action")
 	}
 }
 
-func TestSecretPathNonEmpty(t *testing.T) {
-	if secretPath() == "" {
-		t.Fatal("secretPath should not be empty")
+// TestLinkedReflectsSecretFile checks the linked/secret logic without starting
+// the real daemon (we write the secret file directly rather than calling Link).
+func TestLinkedReflectsSecretFile(t *testing.T) {
+	a := New(t.TempDir())
+	if a.Status().Linked {
+		t.Fatal("should not be linked before a secret is set")
+	}
+	if err := os.WriteFile(a.secretFile(), []byte("  test-secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !a.Status().Linked {
+		t.Fatal("should be linked after the secret file is written")
+	}
+	if a.secret() != "test-secret" {
+		t.Fatalf("secret should be trimmed, got %q", a.secret())
 	}
 }

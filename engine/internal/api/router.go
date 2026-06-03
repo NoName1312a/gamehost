@@ -54,6 +54,7 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 		r.Post("/system/setup/{step}", a.runSetupStep)
 		r.Get("/system/network", a.networkStatus)
 		r.Get("/system/relay", a.relayStatus)
+		r.Post("/system/relay/link", a.relayLink)
 		r.Post("/system/relay/{action}", a.relayAction)
 
 		r.Get("/templates", a.listTemplates)

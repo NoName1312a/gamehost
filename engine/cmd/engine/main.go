@@ -28,7 +28,7 @@ func main() {
 
 	rt := docker.New()
 	netMapper := network.New()
-	relayAgent := relay.New()
+	relayAgent := relay.New(cfg.DataDir)
 
 	reg := templates.NewRegistry(cfg.TemplatesDir)
 	if err := reg.Load(); err != nil {

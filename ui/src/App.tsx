@@ -180,6 +180,7 @@ function RelaySetup({
 }) {
   const [busy, setBusy] = useState(false);
   const [addr, setAddr] = useState("");
+  const [secret, setSecret] = useState("");
 
   async function act(action: string) {
     setBusy(true);
@@ -189,6 +190,19 @@ function RelaySetup({
       /* surfaced via status re-poll */
     } finally {
       setBusy(false);
+      onChanged();
+    }
+  }
+  async function link() {
+    if (!secret.trim()) return;
+    setBusy(true);
+    try {
+      await api.relayLink(secret.trim());
+    } catch {
+      /* surfaced via status re-poll */
+    } finally {
+      setBusy(false);
+      setSecret("");
       onChanged();
     }
   }
@@ -218,11 +232,21 @@ function RelaySetup({
       )}
 
       {relay?.installed && !relay.linked && (
-        <div className="flex flex-wrap items-center gap-2">
-          <button disabled={busy} onClick={() => act("open-setup")} className={primaryBtn}>
-            Link playit account
+        <div className="space-y-2">
+          <button disabled={busy} onClick={() => act("open-setup")} className={ghostBtn}>
+            1. Get a secret key from playit.gg →
           </button>
-          <span className="text-[11px] text-zinc-500">links in your browser, then it auto-detects</span>
+          <div className="flex gap-2">
+            <input
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              placeholder="2. paste your playit secret key"
+              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-emerald-500"
+            />
+            <button disabled={busy || !secret.trim()} onClick={link} className={primaryBtn}>
+              {busy ? "Linking…" : "Link"}
+            </button>
+          </div>
         </div>
       )}
 

@@ -1,11 +1,14 @@
 // Package relay integrates playit.gg as a no-port-forwarding connectivity
 // option, for routers that block UPnP or networks behind CGNAT. The playit
 // agent (a daemon) maintains outbound tunnels that friends connect to; this
-// package is the thin glue around it: locate/install the binary, report whether
-// it's linked to an account and running, supervise the daemon, and open the
-// setup/dashboard pages. Tunnels themselves are created by the user on
-// playit.gg (their CLI is Linux-only and the API is undocumented), so each
-// server stores the address the user copies back from the dashboard.
+// package is the thin glue around it: locate/install the binary, link it with a
+// secret key, supervise the daemon, and open the setup/dashboard pages.
+//
+// On Windows the distributed binary is daemon-only (no interactive claim), so
+// linking uses the headless secret-key method (same as playit's Docker setup):
+// the user generates a secret key on playit.gg and pastes it in; we store it and
+// run the daemon with `--secret`. Tunnels themselves are created by the user on
+// the playit dashboard, so each server stores the address to share.
 package relay
 
 import (
@@ -15,11 +18,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 )
 
 const (
-	SetupURL     = "https://playit.gg/"
+	// SetupURL generates a secret key (the headless/Docker agent flow).
+	SetupURL     = "https://playit.gg/account/agents/new-docker"
 	DashboardURL = "https://playit.gg/account/tunnels"
 	wingetID     = "DevelopedMethods.playit"
 )
@@ -40,20 +45,35 @@ type Status struct {
 	Message      string `json:"message"`
 }
 
-// Agent locates and supervises the playit daemon.
+// Agent locates, links, and supervises the playit daemon.
 type Agent struct {
+	dataDir string
+
 	mu      sync.Mutex
 	cmd     *exec.Cmd
 	running bool
 }
 
-func New() *Agent { return &Agent{} }
+// New returns an Agent that stores its secret under dataDir.
+func New(dataDir string) *Agent { return &Agent{dataDir: dataDir} }
+
+func (a *Agent) secretFile() string { return filepath.Join(a.dataDir, "playit-secret.txt") }
+
+func (a *Agent) secret() string {
+	b, err := os.ReadFile(a.secretFile())
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
+}
+
+func (a *Agent) linked() bool { return a.secret() != "" }
 
 // Status reports installed/linked/running plus the setup + dashboard URLs.
 func (a *Agent) Status() Status {
 	st := Status{
 		Installed:    locate() != "",
-		Linked:       linked(),
+		Linked:       a.linked(),
 		Running:      a.Running(),
 		SetupURL:     SetupURL,
 		DashboardURL: DashboardURL,
@@ -62,7 +82,7 @@ func (a *Agent) Status() Status {
 	case !st.Installed:
 		st.Message = "Install the playit relay to let friends connect without port-forwarding."
 	case !st.Linked:
-		st.Message = "Link your free playit account once, then create a tunnel to your server's port."
+		st.Message = "Get a secret key from playit.gg and paste it here to link your account."
 	default:
 		st.Message = "playit is linked. Create a tunnel on the dashboard, then paste its address onto your server."
 	}
@@ -75,9 +95,26 @@ func (a *Agent) Running() bool {
 	return a.running
 }
 
-// Start runs the playit daemon (it loads its secret from the default path). A
-// no-op if already running; errors if not installed/linked.
+// Link stores the secret key and (re)starts the daemon with it.
+func (a *Agent) Link(secret string) error {
+	secret = strings.TrimSpace(secret)
+	if secret == "" {
+		return errors.New("secret key is empty")
+	}
+	if err := os.MkdirAll(a.dataDir, 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(a.secretFile(), []byte(secret), 0o600); err != nil {
+		return err
+	}
+	a.Stop()
+	return a.Start()
+}
+
+// Start runs the playit daemon with the stored secret. No-op if already
+// running; errors if not installed/linked.
 func (a *Agent) Start() error {
+	key := a.secret()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.running {
@@ -87,10 +124,10 @@ func (a *Agent) Start() error {
 	if bin == "" {
 		return errNotInstalled
 	}
-	if !linked() {
+	if key == "" {
 		return errNotLinked
 	}
-	cmd := exec.Command(bin)
+	cmd := exec.Command(bin, "--secret", key)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
@@ -126,6 +163,25 @@ func (a *Agent) Install() error {
 		"--accept-package-agreements", "--accept-source-agreements").Start()
 }
 
+// RunAction dispatches a UI-triggered relay action (no payload).
+func (a *Agent) RunAction(ctx context.Context, action string) error {
+	switch action {
+	case "install":
+		return a.Install()
+	case "start":
+		return a.Start()
+	case "stop":
+		a.Stop()
+		return nil
+	case "open-setup":
+		return OpenURL(ctx, SetupURL)
+	case "open-dashboard":
+		return OpenURL(ctx, DashboardURL)
+	default:
+		return errors.New("unknown relay action")
+	}
+}
+
 // OpenURL opens a URL in the user's default browser.
 func OpenURL(ctx context.Context, u string) error {
 	switch runtime.GOOS {
@@ -158,37 +214,7 @@ func locate() string {
 	return ""
 }
 
-// linked reports whether the agent has been claimed (secret file present).
-func linked() bool { return exists(secretPath()) }
-
-func secretPath() string {
-	if runtime.GOOS == "windows" {
-		return filepath.Join(os.Getenv("LOCALAPPDATA"), "playit_gg", "playit.toml")
-	}
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "playit_gg", "playit.toml")
-}
-
 func exists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
-}
-
-// RunAction dispatches a UI-triggered relay action.
-func (a *Agent) RunAction(ctx context.Context, action string) error {
-	switch action {
-	case "install":
-		return a.Install()
-	case "start":
-		return a.Start()
-	case "stop":
-		a.Stop()
-		return nil
-	case "open-setup":
-		return OpenURL(ctx, SetupURL)
-	case "open-dashboard":
-		return OpenURL(ctx, DashboardURL)
-	default:
-		return errors.New("unknown relay action")
-	}
 }

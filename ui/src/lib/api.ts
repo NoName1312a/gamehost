@@ -166,6 +166,7 @@ export const api = {
   network: () => get<Network>("/api/system/network"),
   relay: () => get<Relay>("/api/system/relay"),
   relayAction: (action: string) => send<{ status: string }>("POST", `/api/system/relay/${action}`),
+  relayLink: (secret: string) => send<{ status: string }>("POST", "/api/system/relay/link", { secret }),
   setRelayAddress: (id: string, address: string) =>
     send<{ status: string }>("PUT", `/api/servers/${id}/relay-address`, { address }),
   templates: () => get<Template[]>("/api/templates"),

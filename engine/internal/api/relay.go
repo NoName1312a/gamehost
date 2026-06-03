@@ -26,6 +26,23 @@ func (a *API) relayAction(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// relayLink stores the playit secret key (generated on playit.gg) and starts
+// the daemon with it.
+func (a *API) relayLink(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Secret string `json:"secret"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errMsg("invalid request body"))
+		return
+	}
+	if err := a.relay.Link(req.Secret); err != nil {
+		writeJSON(w, http.StatusBadRequest, errMsg(err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
 // setRelayAddress stores the playit address a user pasted back for a server.
 func (a *API) setRelayAddress(w http.ResponseWriter, r *http.Request) {
 	var req struct {
