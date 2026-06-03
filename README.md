@@ -23,7 +23,10 @@ docs/        Design docs
 ## Quick start (dev)
 
 **Prereqs:** Go 1.22+, Node 20+. Docker Desktop is only needed once you actually
-run a game server (M1+) — the panel runs fine without it and shows a setup step.
+run a game server — the panel runs fine without it and shows a setup step.
+
+**One command (Windows):** `powershell -ExecutionPolicy Bypass -File scripts\dev.ps1`
+opens the engine and UI in two windows. Or run them manually:
 
 ### 1. Engine
 ```bash
