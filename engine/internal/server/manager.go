@@ -58,17 +58,29 @@ type CreateRequest struct {
 	Variables  map[string]string `json:"variables"`
 }
 
+// Runtime is the subset of the container runtime the manager needs.
+// *docker.Runtime implements it; a future SDK-based runtime can too. Keeping it
+// an interface also lets the manager be unit-tested without Docker.
+type Runtime interface {
+	Run(ctx context.Context, spec docker.CreateSpec) error
+	Start(ctx context.Context, name string) error
+	Stop(ctx context.Context, name string) error
+	Remove(ctx context.Context, name string) error
+	RemoveVolume(ctx context.Context, name string) error
+	Inspect(ctx context.Context, name string) docker.State
+}
+
 // Manager is a concurrency-safe store of servers backed by a JSON file.
 type Manager struct {
 	mu    sync.RWMutex
 	path  string
-	rt    *docker.Runtime
+	rt    Runtime
 	reg   *templates.Registry
 	items map[string]*Server
 }
 
 // NewManager creates the data dir, loads existing servers, and returns a Manager.
-func NewManager(dataDir string, rt *docker.Runtime, reg *templates.Registry) (*Manager, error) {
+func NewManager(dataDir string, rt Runtime, reg *templates.Registry) (*Manager, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
@@ -162,12 +174,18 @@ func (m *Manager) Create(req CreateRequest) (*Server, error) {
 		if i == 0 && req.Port > 0 {
 			host = req.Port
 		}
+		if host < 1 || host > 65535 {
+			return nil, fmt.Errorf("port %d is out of range (must be 1-65535)", host)
+		}
 		ports = append(ports, docker.PortMapping{Host: host, Container: p.Container, Protocol: p.Protocol})
 	}
 
 	mem := req.MemoryMB
 	if mem <= 0 {
 		mem = t.RecMemoryMB
+	}
+	if t.MinMemoryMB > 0 && mem < t.MinMemoryMB {
+		return nil, fmt.Errorf("%s needs at least %d MB of memory", t.Name, t.MinMemoryMB)
 	}
 	dataPath := t.DataPath
 	if dataPath == "" {
@@ -190,12 +208,30 @@ func (m *Manager) Create(req CreateRequest) (*Server, error) {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if owner := m.portOwner(ports); owner != "" {
+		return nil, fmt.Errorf("port %d is already used by server %q", ports[0].Host, owner)
+	}
 	m.items[s.ID] = s
 	if err := m.save(); err != nil {
 		delete(m.items, s.ID)
 		return nil, err
 	}
 	return s, nil
+}
+
+// portOwner returns the name of an existing server bound to any of the given
+// host ports (same protocol), or "" if there's no conflict. Caller holds m.mu.
+func (m *Manager) portOwner(ports []docker.PortMapping) string {
+	for _, existing := range m.items {
+		for _, ep := range existing.Ports {
+			for _, np := range ports {
+				if ep.Host == np.Host && strings.EqualFold(ep.Protocol, np.Protocol) {
+					return existing.Name
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func (m *Manager) specFor(s *Server) docker.CreateSpec {
