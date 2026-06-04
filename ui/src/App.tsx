@@ -9,7 +9,7 @@ import {
   type ServerSummary,
 } from "./lib/api";
 import { CreateServerModal } from "./components/CreateServerModal";
-import { ServerConsole } from "./components/ServerConsole";
+import { ServerDetail } from "./components/ServerDetail";
 import { SetupWizard } from "./components/SetupWizard";
 import { Settings } from "./components/Settings";
 import { checkForUpdate, type UpdateInfo } from "./lib/updater";
@@ -129,217 +129,36 @@ function ReadyBanner({ runtime }: { runtime: Async<Runtime> }) {
   );
 }
 
-const primaryBtn =
-  "rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50";
-const ghostBtn =
-  "rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50";
-
-function CopyRow({ label, addr, pill }: { label: string; addr: string; pill: ReactNode }) {
-  const [copied, setCopied] = useState(false);
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(addr);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard unavailable */
-    }
-  }
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
-        <code className="text-sm text-zinc-200">{addr}</code>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {pill}
-        <button
-          onClick={copy}
-          className="rounded border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-800"
-        >
-          {copied ? "copied" : "copy"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-const forwardedPill = (
-  <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] text-emerald-300 ring-1 ring-inset ring-emerald-400/20">
-    auto-forwarded
-  </span>
-);
-const relayPill = (
-  <span className="rounded-full bg-sky-400/10 px-2 py-0.5 text-[11px] text-sky-300 ring-1 ring-inset ring-sky-400/20">
-    via relay
-  </span>
-);
-
-// RelaySetup guides the playit relay fallback when a server isn't auto-forwarded:
-// install → link account → open dashboard to create a tunnel → paste the address.
-function RelaySetup({
-  s,
-  relay,
-  port,
-  proto,
-  onChanged,
-}: {
-  s: ServerSummary;
-  relay?: Relay;
-  port?: number;
-  proto: string;
-  onChanged: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [addr, setAddr] = useState("");
-  const [secret, setSecret] = useState("");
-
-  async function act(action: string) {
-    setBusy(true);
-    try {
-      await api.relayAction(action);
-    } catch {
-      /* surfaced via status re-poll */
-    } finally {
-      setBusy(false);
-      onChanged();
-    }
-  }
-  async function link() {
-    if (!secret.trim()) return;
-    setBusy(true);
-    try {
-      await api.relayLink(secret.trim());
-    } catch {
-      /* surfaced via status re-poll */
-    } finally {
-      setBusy(false);
-      setSecret("");
-      onChanged();
-    }
-  }
-  async function save() {
-    if (!addr.trim()) return;
-    setBusy(true);
-    try {
-      await api.setRelayAddress(s.id, addr.trim());
-    } finally {
-      setBusy(false);
-      onChanged();
-    }
-  }
-
-  return (
-    <div className="space-y-2">
-      <p className="text-[11px] uppercase tracking-wide text-zinc-500">Share online (no port-forwarding)</p>
-      <p className="text-xs text-zinc-400">
-        This server isn't auto-forwarded. Use a free playit.gg relay so friends can connect without router setup
-        {port ? ` — or forward port ${port} (${proto}) in your router.` : "."}
-      </p>
-
-      {!relay?.installed && (
-        <button disabled={busy} onClick={() => act("install")} className={primaryBtn}>
-          {busy ? "Installing…" : "Install playit relay"}
-        </button>
-      )}
-
-      {relay?.installed && !relay.linked && (
-        <div className="space-y-2">
-          <button disabled={busy} onClick={() => act("open-setup")} className={ghostBtn}>
-            1. Get a secret key from playit.gg →
-          </button>
-          <div className="flex gap-2">
-            <input
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-              placeholder="2. paste your playit secret key"
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-emerald-500"
-            />
-            <button disabled={busy || !secret.trim()} onClick={link} className={primaryBtn}>
-              {busy ? "Linking…" : "Link"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {relay?.installed && relay.linked && (
-        <div className="space-y-2">
-          <button disabled={busy} onClick={() => act("open-dashboard")} className={ghostBtn}>
-            Open playit dashboard → create a tunnel
-          </button>
-          <div className="flex gap-2">
-            <input
-              value={addr}
-              onChange={(e) => setAddr(e.target.value)}
-              placeholder="paste your playit address, e.g. name.playit.gg:35211"
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-emerald-500"
-            />
-            <button disabled={busy || !addr.trim()} onClick={save} className={primaryBtn}>
-              Save
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ShareLine({ s, relay, onChanged }: { s: ServerSummary; relay?: Relay; onChanged: () => void }) {
-  const port = s.ports?.[0]?.host;
-  const proto = (s.ports?.[0]?.protocol ?? "tcp").toUpperCase();
-  const directOK = s.shared && !!s.externalAddress;
-
-  async function stopSharing() {
-    try {
-      await api.setRelayAddress(s.id, "");
-    } finally {
-      onChanged();
-    }
-  }
-
-  return (
-    <div className="mt-3 space-y-2 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
-      {directOK ? (
-        <CopyRow label="Friends connect to" addr={s.externalAddress!} pill={forwardedPill} />
-      ) : s.relayAddress ? (
-        <>
-          <CopyRow label="Friends connect to" addr={s.relayAddress} pill={relayPill} />
-          <button
-            onClick={stopSharing}
-            className="text-[11px] text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
-          >
-            change / stop sharing
-          </button>
-        </>
-      ) : (
-        <RelaySetup s={s} relay={relay} port={port} proto={proto} onChanged={onChanged} />
-      )}
-    </div>
-  );
-}
-
+// A server card is a clickable summary; clicking it opens the full server
+// detail page (settings, sharing, console). Start/Stop stays on the card as a
+// quick action and stops click-through to the card.
 function ServerCard({
   s,
   busy,
-  relay,
-  onChanged,
+  onOpen,
   onStart,
   onStop,
-  onDelete,
-  onConsole,
 }: {
   s: ServerSummary;
   busy?: string;
-  relay?: Relay;
-  onChanged: () => void;
+  onOpen: () => void;
   onStart: () => void;
   onStop: () => void;
-  onDelete: () => void;
-  onConsole: () => void;
 }) {
   const port = s.ports?.[0]?.host;
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className="group cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 transition hover:border-zinc-700 hover:bg-zinc-900/70 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+    >
       <div className="flex items-start justify-between gap-2">
         <div>
           <h3 className="font-semibold text-zinc-100">{s.name}</h3>
@@ -351,12 +170,13 @@ function ServerCard({
         <Badge className={statusStyle(s.status)}>{busy ?? s.status}</Badge>
       </div>
 
-      {s.running && <ShareLine s={s} relay={relay} onChanged={onChanged} />}
-
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex items-center gap-2">
         {s.running ? (
           <button
-            onClick={onStop}
+            onClick={(e) => {
+              e.stopPropagation();
+              onStop();
+            }}
             disabled={!!busy}
             className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
           >
@@ -364,26 +184,17 @@ function ServerCard({
           </button>
         ) : (
           <button
-            onClick={onStart}
+            onClick={(e) => {
+              e.stopPropagation();
+              onStart();
+            }}
             disabled={!!busy}
             className="rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
           >
             Start
           </button>
         )}
-        <button
-          onClick={onConsole}
-          className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800"
-        >
-          Console
-        </button>
-        <button
-          onClick={onDelete}
-          disabled={!!busy}
-          className="ml-auto rounded-lg border border-rose-500/30 px-3 py-1.5 text-sm text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
-        >
-          Delete
-        </button>
+        <span className="ml-auto text-sm text-zinc-500 group-hover:text-zinc-300">Manage →</span>
       </div>
     </div>
   );
@@ -410,7 +221,7 @@ export default function App() {
   const { servers, refresh } = useServers(health.status === "ok");
 
   const [modalTemplate, setModalTemplate] = useState<Template | null>(null);
-  const [consoleServer, setConsoleServer] = useState<ServerSummary | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -447,6 +258,10 @@ export default function App() {
   const version = health.status === "ok" ? health.data.version : undefined;
   const runtimeReady = runtime.status === "ok" && runtime.data.connected;
 
+  // The open detail page tracks the live server record from the polled list, so
+  // its status/share panels update without re-opening. Closes if it's deleted.
+  const detailServer = detailId ? servers?.find((s) => s.id === detailId) ?? null : null;
+
   return (
     <div className="mx-auto min-h-screen max-w-6xl">
       <Header version={version} onSettings={() => setShowSettings(true)} />
@@ -482,18 +297,9 @@ export default function App() {
                 key={s.id}
                 s={s}
                 busy={busy[s.id]}
-                relay={relay.status === "ok" ? relay.data : undefined}
-                onChanged={() => {
-                  refresh();
-                  retry();
-                }}
+                onOpen={() => setDetailId(s.id)}
                 onStart={() => action(s.id, "starting…", () => api.startServer(s.id))}
                 onStop={() => action(s.id, "stopping…", () => api.stopServer(s.id))}
-                onDelete={() => {
-                  if (confirm(`Delete "${s.name}" and its data? This can't be undone.`))
-                    action(s.id, "deleting…", () => api.deleteServer(s.id));
-                }}
-                onConsole={() => setConsoleServer(s)}
               />
             ))}
           </div>
@@ -557,8 +363,27 @@ export default function App() {
           }}
         />
       )}
-      {consoleServer && (
-        <ServerConsole server={consoleServer} onClose={() => setConsoleServer(null)} />
+      {detailServer && (
+        <ServerDetail
+          key={detailServer.id}
+          server={detailServer}
+          template={templates.status === "ok" ? templates.data.find((t) => t.id === detailServer.templateId) : undefined}
+          relay={relay.status === "ok" ? relay.data : undefined}
+          busy={busy[detailServer.id]}
+          onClose={() => setDetailId(null)}
+          onChanged={() => {
+            refresh();
+            retry();
+          }}
+          onStart={() => action(detailServer.id, "starting…", () => api.startServer(detailServer.id))}
+          onStop={() => action(detailServer.id, "stopping…", () => api.stopServer(detailServer.id))}
+          onDelete={() => {
+            if (confirm(`Delete "${detailServer.name}" and its data? This can't be undone.`)) {
+              action(detailServer.id, "deleting…", () => api.deleteServer(detailServer.id));
+              setDetailId(null);
+            }
+          }}
+        />
       )}
       {showSettings && (
         <Settings

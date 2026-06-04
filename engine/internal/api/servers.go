@@ -31,6 +31,24 @@ func (a *API) createServer(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, s)
 }
 
+func (a *API) updateServer(w http.ResponseWriter, r *http.Request) {
+	var req server.UpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errMsg("invalid request body"))
+		return
+	}
+	// Generous timeout: applying changes may stop, recreate, and restart the
+	// container (and a recreate can re-pull the image).
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
+	defer cancel()
+	s, err := a.mgr.Update(ctx, chi.URLParam(r, "id"), req)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errMsg(err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, s)
+}
+
 func (a *API) startServer(w http.ResponseWriter, r *http.Request) {
 	// Generous timeout: the first start pulls the image, which can be slow.
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)

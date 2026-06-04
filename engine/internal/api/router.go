@@ -41,7 +41,7 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.AllowOrigins,
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		AllowCredentials: false,
 		MaxAge:           300,
@@ -62,6 +62,7 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 
 		r.Get("/servers", a.listServers)
 		r.Post("/servers", a.createServer)
+		r.Patch("/servers/{id}", a.updateServer)
 		r.Put("/servers/{id}/relay-address", a.setRelayAddress)
 		r.Get("/servers/{id}/console", a.console) // WebSocket
 		r.Post("/servers/{id}/start", a.startServer)

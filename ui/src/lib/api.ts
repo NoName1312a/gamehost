@@ -129,6 +129,13 @@ export interface CreateServerRequest {
   variables: Record<string, string>;
 }
 
+export interface UpdateServerRequest {
+  name: string;
+  memoryMB: number;
+  port: number;
+  variables: Record<string, string>;
+}
+
 async function parseError(res: Response, path: string): Promise<string> {
   try {
     const j = await res.json();
@@ -172,6 +179,8 @@ export const api = {
   templates: () => get<Template[]>("/api/templates"),
   servers: () => get<ServerSummary[]>("/api/servers"),
   createServer: (req: CreateServerRequest) => send<ServerSummary>("POST", "/api/servers", req),
+  updateServer: (id: string, req: UpdateServerRequest) =>
+    send<ServerSummary>("PATCH", `/api/servers/${id}`, req),
   startServer: (id: string) => send<{ status: string }>("POST", `/api/servers/${id}/start`),
   stopServer: (id: string) => send<{ status: string }>("POST", `/api/servers/${id}/stop`),
   deleteServer: (id: string) => send<{ status: string }>("DELETE", `/api/servers/${id}`),

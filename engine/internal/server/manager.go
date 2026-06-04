@@ -257,7 +257,16 @@ func (m *Manager) Create(req CreateRequest) (*Server, error) {
 // portOwner returns the name of an existing server bound to any of the given
 // host ports (same protocol), or "" if there's no conflict. Caller holds m.mu.
 func (m *Manager) portOwner(ports []docker.PortMapping) string {
+	return m.portOwnerExcept(ports, "")
+}
+
+// portOwnerExcept is portOwner but ignores the server with the given ID, so a
+// server's own ports don't count as a conflict when updating it. Caller holds m.mu.
+func (m *Manager) portOwnerExcept(ports []docker.PortMapping, exceptID string) string {
 	for _, existing := range m.items {
+		if existing.ID == exceptID {
+			continue
+		}
 		for _, ep := range existing.Ports {
 			for _, np := range ports {
 				if ep.Host == np.Host && strings.EqualFold(ep.Protocol, np.Protocol) {
@@ -267,6 +276,112 @@ func (m *Manager) portOwner(ports []docker.PortMapping) string {
 		}
 	}
 	return ""
+}
+
+// UpdateRequest changes an existing server's editable settings. Fields left at
+// their zero value fall back to the server's current values.
+type UpdateRequest struct {
+	Name      string            `json:"name"`
+	MemoryMB  int               `json:"memoryMB"`
+	Port      int               `json:"port"` // primary host port
+	Variables map[string]string `json:"variables"`
+}
+
+// Update validates and applies new settings to a server. Because a container's
+// env/ports/memory are fixed at creation, it removes the existing container
+// (keeping the data volume, so saved worlds/config survive) and lets the next
+// Start recreate it from the new spec. If the server was running it is
+// restarted so the change takes effect immediately.
+func (m *Manager) Update(ctx context.Context, id string, req UpdateRequest) (*Server, error) {
+	m.mu.Lock()
+	s, ok := m.items[id]
+	if !ok {
+		m.mu.Unlock()
+		return nil, fmt.Errorf("server not found")
+	}
+	t, ok := m.reg.Get(s.TemplateID)
+	if !ok {
+		m.mu.Unlock()
+		return nil, fmt.Errorf("unknown template %q", s.TemplateID)
+	}
+
+	// Compute (and validate) the new values before mutating anything.
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = s.Name
+	}
+
+	env := map[string]string{}
+	for k, v := range t.Env {
+		env[k] = v
+	}
+	for k, v := range req.Variables {
+		if strings.TrimSpace(v) != "" {
+			env[k] = v
+		}
+	}
+
+	// Rebuild ports from the template, preserving the server's existing host
+	// ports and letting req.Port override the primary one.
+	ports := make([]docker.PortMapping, 0, len(t.Ports))
+	for i, p := range t.Ports {
+		host := p.Default
+		if i < len(s.Ports) {
+			host = s.Ports[i].Host
+		}
+		if i == 0 && req.Port > 0 {
+			host = req.Port
+		}
+		if host < 1 || host > 65535 {
+			m.mu.Unlock()
+			return nil, fmt.Errorf("port %d is out of range (must be 1-65535)", host)
+		}
+		ports = append(ports, docker.PortMapping{Host: host, Container: p.Container, Protocol: p.Protocol})
+	}
+
+	mem := req.MemoryMB
+	if mem <= 0 {
+		mem = s.MemoryMB
+	}
+	if t.MinMemoryMB > 0 && mem < t.MinMemoryMB {
+		m.mu.Unlock()
+		return nil, fmt.Errorf("%s needs at least %d MB of memory", t.Name, t.MinMemoryMB)
+	}
+
+	if owner := m.portOwnerExcept(ports, id); owner != "" {
+		m.mu.Unlock()
+		return nil, fmt.Errorf("port %d is already used by server %q", ports[0].Host, owner)
+	}
+	m.mu.Unlock()
+
+	// Tear down the old container (keep the data volume) so the new spec applies.
+	st := m.rt.Inspect(ctx, s.ContainerName())
+	wasRunning := st.Running
+	if st.Running {
+		_ = m.rt.Stop(ctx, s.ContainerName())
+		m.unmapPorts(ctx, s) // unmap the OLD ports while s still holds them
+	}
+	if st.Exists {
+		_ = m.rt.Remove(ctx, s.ContainerName())
+	}
+
+	m.mu.Lock()
+	s.Name = name
+	s.Env = env
+	s.Ports = ports
+	s.MemoryMB = mem
+	if err := m.save(); err != nil {
+		m.mu.Unlock()
+		return nil, err
+	}
+	m.mu.Unlock()
+
+	if wasRunning {
+		if err := m.Start(ctx, id); err != nil {
+			return s, fmt.Errorf("settings saved, but restarting the server failed: %w", err)
+		}
+	}
+	return s, nil
 }
 
 func (m *Manager) specFor(s *Server) docker.CreateSpec {
