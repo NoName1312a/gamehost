@@ -53,6 +53,11 @@ func main() {
 	// The relay agent is started on demand by the manager — only while a
 	// relay-shared server is actually running — so it's never always-on.
 
+	// Drive per-server daily restart/backup schedules for the engine's lifetime.
+	schedCtx, schedCancel := context.WithCancel(context.Background())
+	defer schedCancel()
+	go mgr.RunScheduler(schedCtx)
+
 	go func() {
 		slog.Info("engine listening", "addr", cfg.Addr, "data", cfg.DataDir)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

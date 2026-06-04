@@ -39,6 +39,10 @@ type Server struct {
 	// RelayAddress is the public playit.gg address the user pasted back from
 	// the playit dashboard for sharing this server. Empty if not using a relay.
 	RelayAddress string `json:"relayAddress,omitempty"`
+	// RestartAt / BackupAt are optional daily schedule times in local "HH:MM"
+	// (24h). Empty disables that schedule.
+	RestartAt string `json:"restartAt,omitempty"`
+	BackupAt  string `json:"backupAt,omitempty"`
 }
 
 // ContainerName is the Docker container name for this server.
@@ -78,6 +82,8 @@ type Runtime interface {
 	Remove(ctx context.Context, name string) error
 	RemoveVolume(ctx context.Context, name string) error
 	Inspect(ctx context.Context, name string) docker.State
+	RestoreVolume(ctx context.Context, serverVol, id, file string) error
+	CreateBackup(ctx context.Context, serverVol, id, file string) error
 }
 
 // Networking is the subset of the UPnP port mapper the manager needs.
@@ -445,6 +451,32 @@ func (m *Manager) Stop(ctx context.Context, id string) error {
 	return err
 }
 
+// RestoreBackup restores a server's data volume from a backup archive. It stops
+// the container first (extracting over a live volume would corrupt it) and
+// restarts it afterward if it was running. The data volume is replaced; the
+// container's settings (env/ports/memory) are unchanged.
+func (m *Manager) RestoreBackup(ctx context.Context, id, file string) error {
+	s, ok := m.Get(id)
+	if !ok {
+		return fmt.Errorf("server not found")
+	}
+	wasRunning := m.rt.Inspect(ctx, s.ContainerName()).Running
+	if wasRunning {
+		if err := m.Stop(ctx, id); err != nil {
+			return fmt.Errorf("stop before restore failed: %w", err)
+		}
+	}
+	if err := m.rt.RestoreVolume(ctx, s.VolumeName(), id, file); err != nil {
+		return err
+	}
+	if wasRunning {
+		if err := m.Start(ctx, id); err != nil {
+			return fmt.Errorf("backup restored, but restarting the server failed: %w", err)
+		}
+	}
+	return nil
+}
+
 // Delete removes the container, its data volume, its port mappings, and the record.
 func (m *Manager) Delete(ctx context.Context, id string) error {
 	s, ok := m.Get(id)
@@ -553,4 +585,100 @@ func (m *Manager) List(ctx context.Context) []ServerView {
 		views = append(views, view)
 	}
 	return views
+}
+
+// SetSchedule sets a server's daily restart/backup times ("HH:MM" 24h local, or
+// "" to disable).
+func (m *Manager) SetSchedule(id, restartAt, backupAt string) error {
+	restartAt, backupAt = strings.TrimSpace(restartAt), strings.TrimSpace(backupAt)
+	if !validHHMM(restartAt) || !validHHMM(backupAt) {
+		return fmt.Errorf("times must be HH:MM (24-hour) or empty")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.items[id]
+	if !ok {
+		return fmt.Errorf("server not found")
+	}
+	s.RestartAt, s.BackupAt = restartAt, backupAt
+	return m.save()
+}
+
+func validHHMM(s string) bool {
+	if s == "" {
+		return true
+	}
+	if len(s) != 5 || s[2] != ':' {
+		return false
+	}
+	h, err1 := strconv.Atoi(s[:2])
+	mn, err2 := strconv.Atoi(s[3:])
+	return err1 == nil && err2 == nil && h >= 0 && h < 24 && mn >= 0 && mn < 60
+}
+
+// RunScheduler fires per-server daily restart/backup schedules until ctx is
+// cancelled. It ticks every 30s (so each target minute is caught) and de-dupes
+// by minute so an action fires at most once per scheduled time.
+func (m *Manager) RunScheduler(ctx context.Context) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	fired := map[string]string{} // "r:"/"b:"+id -> last "2006-01-02 15:04" fired
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			hm, stamp := now.Format("15:04"), now.Format("2006-01-02 15:04")
+			var restarts, backups []string
+			m.mu.RLock()
+			for _, s := range m.items {
+				if s.RestartAt == hm && fired["r:"+s.ID] != stamp {
+					restarts = append(restarts, s.ID)
+				}
+				if s.BackupAt == hm && fired["b:"+s.ID] != stamp {
+					backups = append(backups, s.ID)
+				}
+			}
+			m.mu.RUnlock()
+			for _, id := range restarts {
+				fired["r:"+id] = stamp
+				go m.scheduledRestart(id)
+			}
+			for _, id := range backups {
+				fired["b:"+id] = stamp
+				go m.scheduledBackup(id)
+			}
+		}
+	}
+}
+
+func (m *Manager) scheduledRestart(id string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	s, ok := m.Get(id)
+	if !ok || !m.rt.Inspect(ctx, s.ContainerName()).Running {
+		return // only restart a server that's actually running
+	}
+	slog.Info("scheduled restart", "server", s.Name)
+	if err := m.Stop(ctx, id); err != nil {
+		slog.Warn("scheduled restart: stop failed", "server", s.Name, "err", err)
+		return
+	}
+	if err := m.Start(ctx, id); err != nil {
+		slog.Warn("scheduled restart: start failed", "server", s.Name, "err", err)
+	}
+}
+
+func (m *Manager) scheduledBackup(id string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	s, ok := m.Get(id)
+	if !ok {
+		return
+	}
+	file := time.Now().UTC().Format("2006-01-02_15-04-05") + ".tar.gz"
+	slog.Info("scheduled backup", "server", s.Name, "file", file)
+	if err := m.rt.CreateBackup(ctx, s.VolumeName(), id, file); err != nil {
+		slog.Warn("scheduled backup failed", "server", s.Name, "err", err)
+	}
 }

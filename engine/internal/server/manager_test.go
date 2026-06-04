@@ -16,12 +16,14 @@ type fakeRuntime struct {
 	state docker.State
 }
 
-func (f *fakeRuntime) Run(context.Context, docker.CreateSpec) error { return nil }
-func (f *fakeRuntime) Start(context.Context, string) error          { return nil }
-func (f *fakeRuntime) Stop(context.Context, string) error           { return nil }
-func (f *fakeRuntime) Remove(context.Context, string) error         { return nil }
-func (f *fakeRuntime) RemoveVolume(context.Context, string) error   { return nil }
-func (f *fakeRuntime) Inspect(context.Context, string) docker.State { return f.state }
+func (f *fakeRuntime) Run(context.Context, docker.CreateSpec) error                { return nil }
+func (f *fakeRuntime) Start(context.Context, string) error                         { return nil }
+func (f *fakeRuntime) Stop(context.Context, string) error                          { return nil }
+func (f *fakeRuntime) Remove(context.Context, string) error                        { return nil }
+func (f *fakeRuntime) RemoveVolume(context.Context, string) error                  { return nil }
+func (f *fakeRuntime) Inspect(context.Context, string) docker.State                { return f.state }
+func (f *fakeRuntime) RestoreVolume(context.Context, string, string, string) error { return nil }
+func (f *fakeRuntime) CreateBackup(context.Context, string, string, string) error  { return nil }
 
 // fakeRelay records start/stop calls so tests can assert the agent's lifecycle.
 type fakeRelay struct {
@@ -250,6 +252,21 @@ func TestRelayRunsOnlyWhileHosting(t *testing.T) {
 	}
 	if rel3.started || rel3.stops == 0 {
 		t.Errorf("relay should be stopped when no relay-shared server is running (started=%v stops=%d)", rel3.started, rel3.stops)
+	}
+}
+
+func TestValidHHMM(t *testing.T) {
+	valid := []string{"", "00:00", "23:59", "09:30", "12:05"}
+	invalid := []string{"9:30", "24:00", "12:60", "1234", "ab:cd", "12:5", "012:00"}
+	for _, s := range valid {
+		if !validHHMM(s) {
+			t.Errorf("validHHMM(%q) = false, want true", s)
+		}
+	}
+	for _, s := range invalid {
+		if validHHMM(s) {
+			t.Errorf("validHHMM(%q) = true, want false", s)
+		}
 	}
 }
 

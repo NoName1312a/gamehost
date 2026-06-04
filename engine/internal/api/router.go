@@ -71,6 +71,11 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 		r.Put("/servers/{id}/files", a.writeFile)
 		r.Post("/servers/{id}/files/mkdir", a.makeDir)
 		r.Delete("/servers/{id}/files", a.deleteFile)
+		r.Get("/servers/{id}/backups", a.listBackups)
+		r.Post("/servers/{id}/backups", a.createBackup)
+		r.Post("/servers/{id}/backups/restore", a.restoreBackup)
+		r.Delete("/servers/{id}/backups", a.deleteBackup)
+		r.Put("/servers/{id}/schedule", a.setSchedule)
 		r.Get("/servers/{id}/console", a.console) // WebSocket
 		r.Post("/servers/{id}/start", a.startServer)
 		r.Post("/servers/{id}/stop", a.stopServer)

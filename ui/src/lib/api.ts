@@ -142,6 +142,13 @@ export interface ServerSummary {
   externalAddress?: string; // public "host:port" friends connect to
   shared?: boolean; // port currently forwarded on the router
   relayAddress?: string; // playit relay address the user pasted back for sharing
+  restartAt?: string; // daily auto-restart time "HH:MM" (local), "" = off
+  backupAt?: string; // daily backup time "HH:MM" (local), "" = off
+}
+
+export interface BackupInfo {
+  name: string;
+  size: number;
 }
 
 export interface CreateServerRequest {
@@ -211,6 +218,14 @@ export const api = {
     send<{ status: string }>("POST", `/api/servers/${id}/files/mkdir`, { path }),
   deleteFile: (id: string, path: string) =>
     send<{ status: string }>("DELETE", `/api/servers/${id}/files?path=${encodeURIComponent(path)}`),
+  listBackups: (id: string) => get<{ backups: BackupInfo[] }>(`/api/servers/${id}/backups`),
+  createBackup: (id: string) => send<{ file: string }>("POST", `/api/servers/${id}/backups`),
+  restoreBackup: (id: string, file: string) =>
+    send<{ status: string }>("POST", `/api/servers/${id}/backups/restore`, { file }),
+  deleteBackup: (id: string, file: string) =>
+    send<{ status: string }>("DELETE", `/api/servers/${id}/backups?file=${encodeURIComponent(file)}`),
+  setSchedule: (id: string, restartAt: string, backupAt: string) =>
+    send<{ status: string }>("PUT", `/api/servers/${id}/schedule`, { restartAt, backupAt }),
   templates: () => get<Template[]>("/api/templates"),
   servers: () => get<ServerSummary[]>("/api/servers"),
   createServer: (req: CreateServerRequest) => send<ServerSummary>("POST", "/api/servers", req),

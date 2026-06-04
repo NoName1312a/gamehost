@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   api,
+  type BackupInfo,
   type Connectivity,
   type Reachable,
   type Relay,
@@ -321,6 +322,171 @@ function ConnectionPanel({ s, relay, onChanged }: { s: ServerSummary; relay?: Re
   );
 }
 
+// ---- backups & schedules ---------------------------------------------------
+
+const fieldCls =
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-emerald-500";
+const labelCls = "mb-1 block text-xs font-medium text-zinc-400";
+
+function fmtBytes(n: number): string {
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + " MB";
+  return (n / 1024 / 1024 / 1024).toFixed(2) + " GB";
+}
+// Backup filenames are engine timestamps like 2026-06-04_11-05-30.tar.gz.
+function fmtBackupName(name: string): string {
+  const base = name.replace(/\.tar\.gz$/, "");
+  const [date, time] = base.split("_");
+  return date && time ? `${date} ${time.replace(/-/g, ":")} UTC` : name;
+}
+
+function BackupsPanel({ s }: { s: ServerSummary }) {
+  const [backups, setBackups] = useState<BackupInfo[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await api.listBackups(s.id);
+      setBackups(r.backups);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, [s.id]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
+
+  async function backup() {
+    setBusy("Backing up… (this can take a while)");
+    setError(null);
+    try {
+      await api.createBackup(s.id);
+      await load();
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function restore(name: string) {
+    if (
+      !confirm(
+        `Restore "${fmtBackupName(name)}"? This replaces the current world/data` +
+          (s.running ? " and restarts the server" : "") +
+          ". Anything not in this backup is lost.",
+      )
+    )
+      return;
+    setBusy("Restoring…");
+    setError(null);
+    try {
+      await api.restoreBackup(s.id, name);
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function del(name: string) {
+    if (!confirm(`Delete backup "${fmtBackupName(name)}"?`)) return;
+    try {
+      await api.deleteBackup(s.id, name);
+      await load();
+    } catch (e) {
+      fail(e);
+    }
+  }
+
+  const sorted = backups ? [...backups].sort((a, b) => b.name.localeCompare(a.name)) : [];
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <button onClick={backup} disabled={!!busy} className={primaryBtn}>
+          {busy === "Restoring…" ? "Back up now" : busy ?? "Back up now"}
+        </button>
+        {busy === "Restoring…" && <span className="text-xs text-amber-400">Restoring…</span>}
+      </div>
+      {error && <p className="text-xs text-rose-400">{error}</p>}
+      {backups && sorted.length === 0 && <p className="text-sm text-zinc-500">No backups yet.</p>}
+      {sorted.map((b) => (
+        <div
+          key={b.name}
+          className="flex items-center justify-between gap-2 rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2"
+        >
+          <div className="min-w-0">
+            <p className="truncate text-sm text-zinc-200">{fmtBackupName(b.name)}</p>
+            <p className="text-[11px] text-zinc-500">{fmtBytes(b.size)}</p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button onClick={() => restore(b.name)} disabled={!!busy} className={ghostBtn}>
+              Restore
+            </button>
+            <button
+              onClick={() => del(b.name)}
+              disabled={!!busy}
+              className="rounded-lg border border-rose-500/30 px-3 py-1.5 text-sm text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SchedulesPanel({ s, onChanged }: { s: ServerSummary; onChanged: () => void }) {
+  const [restartAt, setRestartAt] = useState(s.restartAt ?? "");
+  const [backupAt, setBackupAt] = useState(s.backupAt ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setSaving(true);
+    setSaved(false);
+    setError(null);
+    try {
+      await api.setSchedule(s.id, restartAt, backupAt);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-zinc-500">Daily, in this PC's local time. Leave a field blank to turn it off.</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>Auto-restart at</label>
+          <input type="time" className={fieldCls} value={restartAt} onChange={(e) => setRestartAt(e.target.value)} />
+        </div>
+        <div>
+          <label className={labelCls}>Auto-backup at</label>
+          <input type="time" className={fieldCls} value={backupAt} onChange={(e) => setBackupAt(e.target.value)} />
+        </div>
+      </div>
+      {error && <p className="text-xs text-rose-400">{error}</p>}
+      <div className="flex items-center gap-3">
+        <button onClick={save} disabled={saving} className={primaryBtn}>
+          {saving ? "Saving…" : "Save schedule"}
+        </button>
+        {saved && <span className="text-sm text-emerald-400">Saved ✓</span>}
+      </div>
+    </div>
+  );
+}
+
 // ---- page ------------------------------------------------------------------
 
 export function ServerDetail({
@@ -532,6 +698,18 @@ export function ServerDetail({
                 {saved && <span className="text-sm text-emerald-400">Saved ✓</span>}
               </div>
             </form>
+          </section>
+
+          {/* Backups */}
+          <section>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Backups</h3>
+            <BackupsPanel s={server} />
+          </section>
+
+          {/* Schedules */}
+          <section>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Schedules</h3>
+            <SchedulesPanel s={server} onChanged={onChanged} />
           </section>
         </div>
       </div>
