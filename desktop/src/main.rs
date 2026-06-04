@@ -37,6 +37,24 @@ fn resolve_templates_dir(app: &tauri::App) -> Option<PathBuf> {
     candidates.into_iter().find(|p| p.is_dir())
 }
 
+/// Resolve the bundled playit relay agent: next to the app exe (where Tauri
+/// installs externalBins, target-triple stripped) for the installed app, or the
+/// staged binary under the crate dir for `tauri dev`. Returns `None` if not
+/// found, in which case the engine falls back to a system/winget playit.
+fn resolve_playit() -> Option<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join("playit.exe"));
+        }
+    }
+    candidates.push(PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/binaries/playit-x86_64-pc-windows-msvc.exe"
+    )));
+    candidates.into_iter().find(|p| p.is_file())
+}
+
 fn main() {
     tauri::Builder::default()
         // Single-instance must be the first plugin registered. A second launch
@@ -60,6 +78,11 @@ fn main() {
                 .expect("engine sidecar binary is not bundled");
             if let Some(dir) = &templates_dir {
                 sidecar = sidecar.env("GAMEHOST_TEMPLATES", dir.to_string_lossy().to_string());
+            }
+            // Point the engine at the bundled playit agent so the relay needs no
+            // separate winget install. The engine runs it only while hosting.
+            if let Some(playit) = resolve_playit() {
+                sidecar = sidecar.env("GAMEHOST_PLAYIT", playit.to_string_lossy().to_string());
             }
             // GAMEHOST_DATA is left unset: the engine defaults to
             // %APPDATA%\gamehost\data, which is correct for a desktop install.

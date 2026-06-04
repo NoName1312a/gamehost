@@ -90,19 +90,29 @@ type Networking interface {
 	IsMapped(port int, proto string) bool
 }
 
+// Relay is the subset of the playit relay agent the manager needs. *relay.Agent
+// implements it. Optional (may be nil). The manager drives it so the agent runs
+// only while a relay-shared server is actually hosting — not always-on.
+type Relay interface {
+	Start() error
+	Stop()
+}
+
 // Manager is a concurrency-safe store of servers backed by a JSON file.
 type Manager struct {
 	mu    sync.RWMutex
 	path  string
 	rt    Runtime
 	net   Networking // optional; nil disables auto port-forwarding
+	relay Relay      // optional; nil disables relay lifecycle management
 	reg   *templates.Registry
 	items map[string]*Server
 }
 
 // NewManager creates the data dir, loads existing servers, and returns a
-// Manager. net may be nil to disable UPnP auto-forwarding.
-func NewManager(dataDir string, rt Runtime, net Networking, reg *templates.Registry) (*Manager, error) {
+// Manager. net and rel may be nil to disable UPnP auto-forwarding / relay
+// supervision respectively.
+func NewManager(dataDir string, rt Runtime, net Networking, rel Relay, reg *templates.Registry) (*Manager, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
@@ -110,6 +120,7 @@ func NewManager(dataDir string, rt Runtime, net Networking, reg *templates.Regis
 		path:  filepath.Join(dataDir, "servers.json"),
 		rt:    rt,
 		net:   net,
+		relay: rel,
 		reg:   reg,
 		items: map[string]*Server{},
 	}
@@ -172,13 +183,16 @@ func (m *Manager) Get(id string) (*Server, bool) {
 // SetRelayAddress stores the playit relay address the user shares for a server.
 func (m *Manager) SetRelayAddress(id, addr string) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	s, ok := m.items[id]
 	if !ok {
+		m.mu.Unlock()
 		return fmt.Errorf("server not found")
 	}
 	s.RelayAddress = strings.TrimSpace(addr)
-	return m.save()
+	err := m.save()
+	m.mu.Unlock()
+	m.syncRelay() // a server gaining/losing a relay address may flip agent state
+	return err
 }
 
 // Create validates the request against its template and persists a new server.
@@ -415,6 +429,7 @@ func (m *Manager) Start(ctx context.Context, id string) error {
 		return err
 	}
 	m.mapPorts(ctx, s)
+	m.syncRelay()
 	return nil
 }
 
@@ -426,6 +441,7 @@ func (m *Manager) Stop(ctx context.Context, id string) error {
 	}
 	err := m.rt.Stop(ctx, s.ContainerName())
 	m.unmapPorts(ctx, s)
+	m.syncRelay()
 	return err
 }
 
@@ -440,9 +456,11 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 	_ = m.rt.RemoveVolume(ctx, s.VolumeName())
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	delete(m.items, id)
-	return m.save()
+	err := m.save()
+	m.mu.Unlock()
+	m.syncRelay()
+	return err
 }
 
 // mapPorts forwards each of the server's ports on the router. Best-effort: a
@@ -465,6 +483,43 @@ func (m *Manager) unmapPorts(ctx context.Context, s *Server) {
 	for _, p := range s.Ports {
 		_ = m.net.Unmap(ctx, p.Host, p.Protocol)
 	}
+}
+
+// syncRelay runs the playit relay agent iff at least one relay-shared server is
+// currently running, and stops it otherwise — so it's never "always on", only
+// up while you're actually hosting something shared through it. Best-effort.
+func (m *Manager) syncRelay() {
+	if m.relay == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if m.anyRelayServerRunning(ctx) {
+		if err := m.relay.Start(); err != nil {
+			slog.Debug("relay start skipped", "err", err)
+		}
+	} else {
+		m.relay.Stop()
+	}
+}
+
+// anyRelayServerRunning reports whether a server with a relay address has a
+// running container.
+func (m *Manager) anyRelayServerRunning(ctx context.Context) bool {
+	m.mu.RLock()
+	shared := make([]*Server, 0)
+	for _, s := range m.items {
+		if strings.TrimSpace(s.RelayAddress) != "" {
+			shared = append(shared, s)
+		}
+	}
+	m.mu.RUnlock()
+	for _, s := range shared {
+		if m.rt.Inspect(ctx, s.ContainerName()).Running {
+			return true
+		}
+	}
+	return false
 }
 
 // List returns all servers with their live runtime status.

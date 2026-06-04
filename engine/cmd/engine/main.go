@@ -38,7 +38,7 @@ func main() {
 		slog.Info("loaded game templates", "count", len(reg.List()), "dir", cfg.TemplatesDir)
 	}
 
-	mgr, err := server.NewManager(cfg.DataDir, rt, netMapper, reg)
+	mgr, err := server.NewManager(cfg.DataDir, rt, netMapper, relayAgent, reg)
 	if err != nil {
 		slog.Error("failed to initialize server manager", "err", err)
 		os.Exit(1)
@@ -50,12 +50,8 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	// If playit is already linked, bring its tunnels up alongside the engine.
-	go func() {
-		if err := relayAgent.Start(); err != nil {
-			slog.Debug("playit relay not started", "err", err)
-		}
-	}()
+	// The relay agent is started on demand by the manager — only while a
+	// relay-shared server is actually running — so it's never always-on.
 
 	go func() {
 		slog.Info("engine listening", "addr", cfg.Addr, "data", cfg.DataDir)

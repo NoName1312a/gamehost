@@ -16,12 +16,21 @@ type fakeRuntime struct {
 	state docker.State
 }
 
-func (f *fakeRuntime) Run(context.Context, docker.CreateSpec) error  { return nil }
-func (f *fakeRuntime) Start(context.Context, string) error           { return nil }
-func (f *fakeRuntime) Stop(context.Context, string) error            { return nil }
-func (f *fakeRuntime) Remove(context.Context, string) error          { return nil }
-func (f *fakeRuntime) RemoveVolume(context.Context, string) error    { return nil }
-func (f *fakeRuntime) Inspect(context.Context, string) docker.State  { return f.state }
+func (f *fakeRuntime) Run(context.Context, docker.CreateSpec) error { return nil }
+func (f *fakeRuntime) Start(context.Context, string) error          { return nil }
+func (f *fakeRuntime) Stop(context.Context, string) error           { return nil }
+func (f *fakeRuntime) Remove(context.Context, string) error         { return nil }
+func (f *fakeRuntime) RemoveVolume(context.Context, string) error   { return nil }
+func (f *fakeRuntime) Inspect(context.Context, string) docker.State { return f.state }
+
+// fakeRelay records start/stop calls so tests can assert the agent's lifecycle.
+type fakeRelay struct {
+	started bool
+	stops   int
+}
+
+func (f *fakeRelay) Start() error { f.started = true; return nil }
+func (f *fakeRelay) Stop()        { f.started = false; f.stops++ }
 
 const testTemplate = `id: test-mc
 name: Test MC
@@ -56,7 +65,7 @@ func newTestManager(t *testing.T) (*Manager, string) {
 		t.Fatalf("load templates: %v", err)
 	}
 	dataDir := t.TempDir()
-	m, err := NewManager(dataDir, &fakeRuntime{}, nil, reg)
+	m, err := NewManager(dataDir, &fakeRuntime{}, nil, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -122,7 +131,7 @@ func TestPersistenceRoundTrip(t *testing.T) {
 
 	// A fresh manager over the same dir should load the server back.
 	reg := m.reg
-	m2, err := NewManager(dataDir, &fakeRuntime{state: docker.State{Exists: true, Status: "running", Running: true}}, nil, reg)
+	m2, err := NewManager(dataDir, &fakeRuntime{state: docker.State{Exists: true, Status: "running", Running: true}}, nil, nil, reg)
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
@@ -190,6 +199,57 @@ func TestUpdateRejectsConflictingPortAndLowMemory(t *testing.T) {
 	// Below-minimum memory is rejected.
 	if _, err := m.Update(context.Background(), a.ID, UpdateRequest{MemoryMB: 256}); err == nil || !strings.Contains(err.Error(), "at least") {
 		t.Fatalf("expected min-memory error, got %v", err)
+	}
+}
+
+func TestRelayRunsOnlyWhileHosting(t *testing.T) {
+	build := func(rt Runtime, rel Relay) *Manager {
+		tdir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(tdir, "test-mc.yaml"), []byte(testTemplate), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		reg := templates.NewRegistry(tdir)
+		if err := reg.Load(); err != nil {
+			t.Fatalf("load templates: %v", err)
+		}
+		m, err := NewManager(t.TempDir(), rt, nil, rel, reg)
+		if err != nil {
+			t.Fatalf("new manager: %v", err)
+		}
+		return m
+	}
+
+	// A running relay-shared server brings the agent up.
+	rel := &fakeRelay{}
+	m := build(&fakeRuntime{state: docker.State{Exists: true, Running: true, Status: "running"}}, rel)
+	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "A", Port: 25565})
+	if err := m.SetRelayAddress(s.ID, "abc.playit.gg:30000"); err != nil {
+		t.Fatalf("set relay: %v", err)
+	}
+	if !rel.started {
+		t.Error("relay should be running while a relay-shared server is up")
+	}
+
+	// A server with no relay address must not start the agent, even when running.
+	rel2 := &fakeRelay{}
+	m2 := build(&fakeRuntime{state: docker.State{Exists: true, Running: true, Status: "running"}}, rel2)
+	s2, _ := m2.Create(CreateRequest{TemplateID: "test-mc", Name: "B", Port: 25565})
+	if err := m2.Start(context.Background(), s2.ID); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if rel2.started {
+		t.Error("relay should not start for a server with no relay address")
+	}
+
+	// A relay-shared server that isn't running keeps the agent stopped.
+	rel3 := &fakeRelay{}
+	m3 := build(&fakeRuntime{state: docker.State{Exists: true, Running: false, Status: "exited"}}, rel3)
+	s3, _ := m3.Create(CreateRequest{TemplateID: "test-mc", Name: "C", Port: 25565})
+	if err := m3.SetRelayAddress(s3.ID, "abc.playit.gg:30000"); err != nil {
+		t.Fatalf("set relay: %v", err)
+	}
+	if rel3.started || rel3.stops == 0 {
+		t.Errorf("relay should be stopped when no relay-shared server is running (started=%v stops=%d)", rel3.started, rel3.stops)
 	}
 }
 
