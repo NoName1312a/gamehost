@@ -24,6 +24,8 @@ func (f *fakeRuntime) RemoveVolume(context.Context, string) error               
 func (f *fakeRuntime) Inspect(context.Context, string) docker.State                { return f.state }
 func (f *fakeRuntime) RestoreVolume(context.Context, string, string, string) error { return nil }
 func (f *fakeRuntime) CreateBackup(context.Context, string, string, string) error  { return nil }
+func (f *fakeRuntime) ImageExists(context.Context, string) bool                    { return true }
+func (f *fakeRuntime) Pull(context.Context, string, func(int, string)) error       { return nil }
 
 // fakeRelay records start/stop calls so tests can assert the agent's lifecycle.
 type fakeRelay struct {

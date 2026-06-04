@@ -6,6 +6,7 @@ import {
   type Reachable,
   type Relay,
   type ServerSummary,
+  type Stats,
   type Template,
 } from "../lib/api";
 import { ServerConsole } from "./ServerConsole";
@@ -487,6 +488,81 @@ function SchedulesPanel({ s, onChanged }: { s: ServerSummary; onChanged: () => v
   );
 }
 
+// ---- resources -------------------------------------------------------------
+
+function Sparkline({ data, max, color }: { data: number[]; max: number; color: string }) {
+  const w = 240;
+  const h = 40;
+  const m = Math.max(max, 1);
+  const len = data.length;
+  const pts = data.map((v, i) => {
+    const x = len <= 1 ? 0 : (i / (len - 1)) * w;
+    const y = h - (Math.min(Math.max(v, 0), m) / m) * h;
+    return [x, y] as const;
+  });
+  const line = pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="h-10 w-full" preserveAspectRatio="none">
+      {len >= 2 && <polygon points={`0,${h} ${line} ${w},${h}`} fill={color} opacity={0.12} />}
+      {len >= 2 && <polyline points={line} fill="none" stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />}
+    </svg>
+  );
+}
+
+function ResourcesPanel({ s }: { s: ServerSummary }) {
+  const [hist, setHist] = useState<Stats[]>([]);
+
+  useEffect(() => {
+    if (!s.running) {
+      setHist([]);
+      return;
+    }
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = async () => {
+      try {
+        const st = await api.stats(s.id);
+        if (alive) setHist((h) => [...h, st].slice(-60));
+      } catch {
+        /* transient; keep the last samples */
+      }
+      if (alive) timer = setTimeout(tick, 2500);
+    };
+    tick();
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [s.id, s.running]);
+
+  if (!s.running) {
+    return <p className="text-sm text-zinc-500">Start the server to see live CPU and memory usage.</p>;
+  }
+  const latest = hist[hist.length - 1];
+  const cpuMax = Math.max(100, ...hist.map((x) => x.cpuPercent));
+  return (
+    <div className="space-y-4">
+      {hist.length === 0 && <p className="text-xs text-zinc-500">Sampling…</p>}
+      <div>
+        <div className="mb-1 flex justify-between text-xs">
+          <span className="text-zinc-400">CPU</span>
+          <span className="text-zinc-200">{latest ? latest.cpuPercent.toFixed(0) : "—"}%</span>
+        </div>
+        <Sparkline data={hist.map((x) => x.cpuPercent)} max={cpuMax} color="#34d399" />
+      </div>
+      <div>
+        <div className="mb-1 flex justify-between text-xs">
+          <span className="text-zinc-400">Memory</span>
+          <span className="text-zinc-200">
+            {latest ? `${latest.memUsedMB.toFixed(0)} / ${latest.memLimitMB.toFixed(0)} MB (${latest.memPercent.toFixed(0)}%)` : "—"}
+          </span>
+        </div>
+        <Sparkline data={hist.map((x) => x.memPercent)} max={100} color="#38bdf8" />
+      </div>
+    </div>
+  );
+}
+
 // ---- page ------------------------------------------------------------------
 
 export function ServerDetail({
@@ -574,6 +650,19 @@ export function ServerDetail({
 
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl space-y-8 px-6 py-6">
+          {server.pulling && (
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+              <p className="text-sm text-emerald-200">First start — downloading game files… {server.pullPercent ?? 0}%</p>
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all"
+                  style={{ width: `${server.pullPercent ?? 0}%` }}
+                />
+              </div>
+              {server.pullStatus && <p className="mt-1 text-xs text-emerald-300/70">{server.pullStatus}</p>}
+            </div>
+          )}
+
           {/* Actions */}
           <section className="flex flex-wrap items-center gap-2">
             {server.running ? (
@@ -606,6 +695,12 @@ export function ServerDetail({
               Connection &amp; sharing
             </h3>
             <ConnectionPanel s={server} relay={relay} onChanged={onChanged} />
+          </section>
+
+          {/* Resources */}
+          <section>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Resources</h3>
+            <ResourcesPanel s={server} />
           </section>
 
           {/* Settings */}

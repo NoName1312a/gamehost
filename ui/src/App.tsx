@@ -167,34 +167,50 @@ function ServerCard({
             {port ? ` · port ${port}` : ""} · {s.memoryMB} MB
           </p>
         </div>
-        <Badge className={statusStyle(s.status)}>{busy ?? s.status}</Badge>
+        <Badge className={statusStyle(s.pulling ? "downloading" : s.status)}>
+          {busy && !s.pulling ? busy : s.pulling ? `downloading ${s.pullPercent ?? 0}%` : s.status}
+        </Badge>
       </div>
 
       <div className="mt-4 flex items-center gap-2">
-        {s.running ? (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onStop();
-            }}
-            disabled={!!busy}
-            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
-          >
-            Stop
-          </button>
+        {s.pulling ? (
+          <div className="w-full">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-all"
+                style={{ width: `${s.pullPercent ?? 0}%` }}
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-zinc-400">{s.pullStatus ?? "Downloading game files…"}</p>
+          </div>
         ) : (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onStart();
-            }}
-            disabled={!!busy}
-            className="rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
-          >
-            Start
-          </button>
+          <>
+            {s.running ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStop();
+                }}
+                disabled={!!busy}
+                className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+              >
+                Stop
+              </button>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStart();
+                }}
+                disabled={!!busy}
+                className="rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
+              >
+                Start
+              </button>
+            )}
+            <span className="ml-auto text-sm text-zinc-500 group-hover:text-zinc-300">Manage →</span>
+          </>
         )}
-        <span className="ml-auto text-sm text-zinc-500 group-hover:text-zinc-300">Manage →</span>
       </div>
     </div>
   );

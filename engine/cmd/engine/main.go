@@ -5,10 +5,12 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -66,11 +68,31 @@ func main() {
 		}
 	}()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	<-stop
+	// Shut down on a signal OR when our parent (the desktop shell) exits. The
+	// shell spawns us with a stdin pipe and sets GAMEHOST_PARENT_WATCH; when the
+	// app dies the pipe closes (stdin EOF), so the engine never orphans. The env
+	// gate keeps standalone/dev runs (TTY stdin) from exiting immediately.
+	shutdown := make(chan struct{})
+	var once sync.Once
+	trigger := func(reason string) {
+		once.Do(func() {
+			slog.Info("shutting down", "reason", reason)
+			close(shutdown)
+		})
+	}
 
-	slog.Info("shutting down")
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
+	go func() { <-sigc; trigger("signal") }()
+
+	if os.Getenv("GAMEHOST_PARENT_WATCH") != "" {
+		go func() {
+			_, _ = io.Copy(io.Discard, os.Stdin) // blocks until the parent closes stdin
+			trigger("parent exited")
+		}()
+	}
+
+	<-shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	// Remove any UPnP port mappings so they don't linger on the router.

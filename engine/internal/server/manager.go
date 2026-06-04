@@ -61,6 +61,10 @@ type ServerView struct {
 	// port is currently forwarded on the router.
 	ExternalAddress string `json:"externalAddress,omitempty"`
 	Shared          bool   `json:"shared"`
+	// Pulling/PullPercent/PullStatus reflect a first-start image download.
+	Pulling     bool   `json:"pulling"`
+	PullPercent int    `json:"pullPercent"`
+	PullStatus  string `json:"pullStatus,omitempty"`
 }
 
 // CreateRequest is the payload to create a new server.
@@ -84,6 +88,8 @@ type Runtime interface {
 	Inspect(ctx context.Context, name string) docker.State
 	RestoreVolume(ctx context.Context, serverVol, id, file string) error
 	CreateBackup(ctx context.Context, serverVol, id, file string) error
+	ImageExists(ctx context.Context, image string) bool
+	Pull(ctx context.Context, image string, onProgress func(percent int, status string)) error
 }
 
 // Networking is the subset of the UPnP port mapper the manager needs.
@@ -113,6 +119,15 @@ type Manager struct {
 	relay Relay      // optional; nil disables relay lifecycle management
 	reg   *templates.Registry
 	items map[string]*Server
+
+	pullMu sync.Mutex
+	pulls  map[string]pullState // server id -> in-progress image download
+}
+
+// pullState is the live first-start image-download progress for a server.
+type pullState struct {
+	Percent int
+	Status  string
 }
 
 // NewManager creates the data dir, loads existing servers, and returns a
@@ -129,6 +144,7 @@ func NewManager(dataDir string, rt Runtime, net Networking, rel Relay, reg *temp
 		relay: rel,
 		reg:   reg,
 		items: map[string]*Server{},
+		pulls: map[string]pullState{},
 	}
 	if err := m.load(); err != nil {
 		return nil, err
@@ -429,6 +445,16 @@ func (m *Manager) Start(ctx context.Context, id string) error {
 	if m.rt.Inspect(ctx, s.ContainerName()).Exists {
 		err = m.rt.Start(ctx, s.ContainerName())
 	} else {
+		// First start: pull the image with progress so the UI can show a bar,
+		// then run (the image is now local, so Run won't pull again).
+		if !m.rt.ImageExists(ctx, s.Image) {
+			m.setPull(id, 0, "Preparing download…")
+			perr := m.rt.Pull(ctx, s.Image, func(pct int, status string) { m.setPull(id, pct, status) })
+			m.clearPull(id)
+			if perr != nil {
+				return perr
+			}
+		}
 		err = m.rt.Run(ctx, m.specFor(s))
 	}
 	if err != nil {
@@ -437,6 +463,25 @@ func (m *Manager) Start(ctx context.Context, id string) error {
 	m.mapPorts(ctx, s)
 	m.syncRelay()
 	return nil
+}
+
+func (m *Manager) setPull(id string, percent int, status string) {
+	m.pullMu.Lock()
+	m.pulls[id] = pullState{Percent: percent, Status: status}
+	m.pullMu.Unlock()
+}
+
+func (m *Manager) clearPull(id string) {
+	m.pullMu.Lock()
+	delete(m.pulls, id)
+	m.pullMu.Unlock()
+}
+
+func (m *Manager) getPull(id string) (pullState, bool) {
+	m.pullMu.Lock()
+	defer m.pullMu.Unlock()
+	p, ok := m.pulls[id]
+	return p, ok
 }
 
 // Stop stops the running container and closes its forwarded port(s).
@@ -573,6 +618,9 @@ func (m *Manager) List(ctx context.Context) []ServerView {
 			status = st.Status
 		}
 		view := ServerView{Server: s, Status: status, Running: st.Running}
+		if p, ok := m.getPull(s.ID); ok {
+			view.Pulling, view.PullPercent, view.PullStatus = true, p.Percent, p.Status
+		}
 		// Surface connectivity for running servers once UPnP discovery has a
 		// public IP / port mapping.
 		if st.Running && m.net != nil && len(s.Ports) > 0 {

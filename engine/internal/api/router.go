@@ -76,6 +76,7 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 		r.Post("/servers/{id}/backups/restore", a.restoreBackup)
 		r.Delete("/servers/{id}/backups", a.deleteBackup)
 		r.Put("/servers/{id}/schedule", a.setSchedule)
+		r.Get("/servers/{id}/stats", a.serverStats)
 		r.Get("/servers/{id}/console", a.console) // WebSocket
 		r.Post("/servers/{id}/start", a.startServer)
 		r.Post("/servers/{id}/stop", a.stopServer)

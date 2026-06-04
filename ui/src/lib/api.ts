@@ -144,11 +144,21 @@ export interface ServerSummary {
   relayAddress?: string; // playit relay address the user pasted back for sharing
   restartAt?: string; // daily auto-restart time "HH:MM" (local), "" = off
   backupAt?: string; // daily backup time "HH:MM" (local), "" = off
+  pulling?: boolean; // first-start image download in progress
+  pullPercent?: number;
+  pullStatus?: string;
 }
 
 export interface BackupInfo {
   name: string;
   size: number;
+}
+
+export interface Stats {
+  cpuPercent: number;
+  memUsedMB: number;
+  memLimitMB: number;
+  memPercent: number;
 }
 
 export interface CreateServerRequest {
@@ -226,6 +236,7 @@ export const api = {
     send<{ status: string }>("DELETE", `/api/servers/${id}/backups?file=${encodeURIComponent(file)}`),
   setSchedule: (id: string, restartAt: string, backupAt: string) =>
     send<{ status: string }>("PUT", `/api/servers/${id}/schedule`, { restartAt, backupAt }),
+  stats: (id: string) => get<Stats>(`/api/servers/${id}/stats`),
   templates: () => get<Template[]>("/api/templates"),
   servers: () => get<ServerSummary[]>("/api/servers"),
   createServer: (req: CreateServerRequest) => send<ServerSummary>("POST", "/api/servers", req),

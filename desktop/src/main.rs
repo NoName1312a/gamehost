@@ -79,6 +79,10 @@ fn main() {
             if let Some(dir) = &templates_dir {
                 sidecar = sidecar.env("GAMEHOST_TEMPLATES", dir.to_string_lossy().to_string());
             }
+            // Tell the engine to exit if we (its parent) die, so it never orphans
+            // and leaves engine.exe locked / port 8723 held. It watches its stdin
+            // pipe, which the OS closes when this process exits.
+            sidecar = sidecar.env("GAMEHOST_PARENT_WATCH", "1");
             // Point the engine at the bundled playit agent so the relay needs no
             // separate winget install. The engine runs it only while hosting.
             if let Some(playit) = resolve_playit() {
