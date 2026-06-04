@@ -11,6 +11,8 @@ import {
 import { CreateServerModal } from "./components/CreateServerModal";
 import { ServerConsole } from "./components/ServerConsole";
 import { SetupWizard } from "./components/SetupWizard";
+import { Settings } from "./components/Settings";
+import { checkForUpdate, type UpdateInfo } from "./lib/updater";
 
 // ---- tiny async helper -----------------------------------------------------
 
@@ -85,7 +87,7 @@ function statusStyle(status: string): string {
 
 // ---- sections --------------------------------------------------------------
 
-function Header({ version }: { version?: string }) {
+function Header({ version, onSettings }: { version?: string; onSettings: () => void }) {
   return (
     <header className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
       <div className="flex items-center gap-3">
@@ -97,7 +99,17 @@ function Header({ version }: { version?: string }) {
           <p className="text-xs text-zinc-500">Self-host game servers, simply</p>
         </div>
       </div>
-      {version && <Badge className="bg-zinc-800 text-zinc-400 ring-zinc-700">engine {version}</Badge>}
+      <div className="flex items-center gap-3">
+        {version && <Badge className="bg-zinc-800 text-zinc-400 ring-zinc-700">engine {version}</Badge>}
+        <button
+          onClick={onSettings}
+          title="Settings"
+          aria-label="Settings"
+          className="rounded-lg px-2 py-1.5 text-lg leading-none text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+        >
+          ⚙
+        </button>
+      </div>
     </header>
   );
 }
@@ -401,6 +413,15 @@ export default function App() {
   const [consoleServer, setConsoleServer] = useState<ServerSummary | null>(null);
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+
+  // Check for a newer desktop-app version once on launch (no-op in a browser).
+  useEffect(() => {
+    checkForUpdate()
+      .then(setUpdateInfo)
+      .catch(() => {});
+  }, []);
 
   async function action(id: string, label: string, fn: () => Promise<unknown>) {
     setBusy((b) => ({ ...b, [id]: label }));
@@ -428,7 +449,20 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-screen max-w-6xl">
-      <Header version={version} />
+      <Header version={version} onSettings={() => setShowSettings(true)} />
+      {updateInfo && (
+        <div className="mx-6 mt-6 flex items-center justify-between gap-3 rounded-lg border border-sky-500/20 bg-sky-500/5 px-4 py-3">
+          <p className="text-sm text-sky-200">
+            GameHost <span className="font-semibold">v{updateInfo.version}</span> is available.
+          </p>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="rounded-lg bg-sky-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-sky-400"
+          >
+            Update
+          </button>
+        </div>
+      )}
       {runtime.status !== "loading" &&
         (runtimeReady ? (
           <ReadyBanner runtime={runtime} />
@@ -525,6 +559,13 @@ export default function App() {
       )}
       {consoleServer && (
         <ServerConsole server={consoleServer} onClose={() => setConsoleServer(null)} />
+      )}
+      {showSettings && (
+        <Settings
+          engineVersion={version}
+          initialUpdate={updateInfo}
+          onClose={() => setShowSettings(false)}
+        />
       )}
 
       {toast && (

@@ -68,8 +68,21 @@ powershell -ExecutionPolicy Bypass -File scripts\desktop-build.ps1
 # → desktop\target\release\bundle\nsis\GameHost_<version>_x64-setup.exe
 ```
 
-> Docker is still required to actually run game servers (below). A guided
-> in-app setup wizard for that is the next milestone.
+> Docker is still required to actually run game servers — the in-app **setup
+> wizard** (below) guides that. **Auto-updates:** the app checks the public
+> [`gamehost-releases`](https://github.com/NoName1312a/gamehost-releases) feed on
+> launch and from **Settings → Check for updates**, installing signed updates in
+> one click.
+
+### Publishing a release (maintainer)
+Requires the updater signing key at `%USERPROFILE%\.tauri\gamehost-updater.key`
+(never committed) and `gh` authenticated. Bump `version` in
+`desktop/tauri.conf.json`, then:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\release.ps1 -Version <x.y.z>
+```
+This builds the **signed** installer + `latest.json` and publishes them to the
+`gamehost-releases` repo; installed apps then auto-update.
 
 ## Enabling Docker (to run game servers)
 **In the desktop app this is one-click:** when Docker isn't ready, GameHost shows
@@ -90,4 +103,4 @@ Launch Docker Desktop once after install, then restart the engine.
 - [ ] **M3** Files, backups, schedules, settings
 - [ ] **M4** Networking: UPnP auto-forward + relay fallback
 - [~] **M4** Networking: automatic **UPnP** port-forward + sharable connect address ✅; **playit.gg relay** fallback for UPnP-off/CGNAT (guided setup) ✅; self-hosted relay still open
-- [~] **M5** Tauri desktop packaging (Windows ✅); headless server build still open
+- [~] **M5** Tauri desktop packaging (Windows ✅) + **in-app auto-updater** ✅; headless server build still open

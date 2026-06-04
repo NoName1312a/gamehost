@@ -47,6 +47,10 @@ most important decision: it lets the *same* engine power both the desktop app
 - Build: `scripts/desktop-build.ps1` → `desktop/target/release/bundle/nsis/`.
   The bundled templates are staged into `desktop/resources/`; the engine
   sidecar into `desktop/binaries/` (both git-ignored, regenerated each build).
+- **Auto-update:** the Tauri updater plugin checks a public feed
+  (`gamehost-releases` repo's `latest.json`) on launch + from Settings, and
+  installs signed updates one-click. Releases are cut with `scripts/release.ps1`
+  (signs with a local key — never committed; pubkey is in `tauri.conf.json`).
 
 ## Why Docker-per-game
 One container per server gives isolation, per-server CPU/RAM limits, clean
