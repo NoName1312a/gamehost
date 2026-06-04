@@ -101,6 +101,23 @@ export interface PortMapping {
   protocol: string;
 }
 
+export interface Connectivity {
+  running: boolean;
+  port: number;
+  protocol: string;
+  externalIP?: string;
+  externalAddress?: string;
+  localIP?: string;
+  upnpAvailable: boolean;
+  forwarded: boolean;
+}
+
+export interface Reachable {
+  open: boolean;
+  checked: boolean;
+  detail: string;
+}
+
 export interface ServerSummary {
   id: string;
   name: string;
@@ -176,6 +193,8 @@ export const api = {
   relayLink: (secret: string) => send<{ status: string }>("POST", "/api/system/relay/link", { secret }),
   setRelayAddress: (id: string, address: string) =>
     send<{ status: string }>("PUT", `/api/servers/${id}/relay-address`, { address }),
+  connectivity: (id: string) => get<Connectivity>(`/api/servers/${id}/connectivity`),
+  testConnectivity: (id: string) => send<Reachable>("POST", `/api/servers/${id}/connectivity/test`),
   templates: () => get<Template[]>("/api/templates"),
   servers: () => get<ServerSummary[]>("/api/servers"),
   createServer: (req: CreateServerRequest) => send<ServerSummary>("POST", "/api/servers", req),

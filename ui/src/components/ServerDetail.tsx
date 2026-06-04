@@ -1,5 +1,12 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { api, type Relay, type ServerSummary, type Template } from "../lib/api";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import {
+  api,
+  type Connectivity,
+  type Reachable,
+  type Relay,
+  type ServerSummary,
+  type Template,
+} from "../lib/api";
 import { ServerConsole } from "./ServerConsole";
 
 // Button styles shared within this page.
@@ -55,6 +62,11 @@ const forwardedPill = (
 const relayPill = (
   <span className="rounded-full bg-sky-400/10 px-2 py-0.5 text-[11px] text-sky-300 ring-1 ring-inset ring-sky-400/20">
     via relay
+  </span>
+);
+const reachablePill = (
+  <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] text-emerald-300 ring-1 ring-inset ring-emerald-400/20">
+    reachable ✓
   </span>
 );
 
@@ -166,11 +178,40 @@ function RelaySetup({
   );
 }
 
-function ShareSection({ s, relay, onChanged }: { s: ServerSummary; relay?: Relay; onChanged: () => void }) {
-  const port = s.ports?.[0]?.host;
-  const proto = (s.ports?.[0]?.protocol ?? "tcp").toUpperCase();
-  const directOK = s.shared && !!s.externalAddress;
+// ConnectionPanel implements "direct-first": it shows whether the port was
+// auto-forwarded (friends connect directly — nothing extra running), guides a
+// one-time manual forward when the router blocks UPnP, lets the user verify
+// reachability from the internet, and offers the playit relay as the
+// no-router-access fallback.
+function ConnectionPanel({ s, relay, onChanged }: { s: ServerSummary; relay?: Relay; onChanged: () => void }) {
+  const [conn, setConn] = useState<Connectivity | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [test, setTest] = useState<Reachable | null>(null);
 
+  useEffect(() => {
+    if (!s.running) {
+      setConn(null);
+      setTest(null);
+      return;
+    }
+    let alive = true;
+    api.connectivity(s.id).then((c) => alive && setConn(c)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [s.id, s.running]);
+
+  async function runTest() {
+    setTesting(true);
+    setTest(null);
+    try {
+      setTest(await api.testConnectivity(s.id));
+    } catch (e) {
+      setTest({ open: false, checked: false, detail: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setTesting(false);
+    }
+  }
   async function stopSharing() {
     try {
       await api.setRelayAddress(s.id, "");
@@ -180,31 +221,101 @@ function ShareSection({ s, relay, onChanged }: { s: ServerSummary; relay?: Relay
   }
 
   if (!s.running) {
-    return (
-      <p className="text-sm text-zinc-500">
-        Start the server to get a connect address and share it online.
-        {port ? ` Friends on your LAN can use port ${port}.` : ""}
-      </p>
-    );
+    return <p className="text-sm text-zinc-500">Start the server to get a connect address you can share with friends.</p>;
   }
 
+  const port = conn?.port ?? s.ports?.[0]?.host;
+  const proto = (conn?.protocol ?? s.ports?.[0]?.protocol ?? "tcp").toUpperCase();
+  const addr = conn?.externalAddress ?? s.externalAddress;
+  const forwarded = conn?.forwarded ?? s.shared;
+  // A successful reachability test is the source of truth: the port can be open
+  // at the router (manual forward) even when GameHost's own UPnP mapping failed.
+  const reachableConfirmed = !!(test && test.checked && test.open);
+  const directOK = (forwarded || reachableConfirmed) && !!addr;
+
+  const testLine = test ? (
+    <p
+      className={`text-xs ${
+        test.checked ? (test.open ? "text-emerald-400" : "text-amber-400") : "text-zinc-500"
+      }`}
+    >
+      {test.checked
+        ? test.open
+          ? "✓ Reachable from the internet — friends can connect."
+          : "✗ Not reachable yet — the port isn't open from outside."
+        : test.detail}
+    </p>
+  ) : null;
+  const testBtn = (
+    <button onClick={runTest} disabled={testing} className={ghostBtn}>
+      {testing ? "Testing…" : "Test connection"}
+    </button>
+  );
+
   return (
-    <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+    <div className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
       {directOK ? (
-        <CopyRow label="Friends connect to" addr={s.externalAddress!} pill={forwardedPill} />
-      ) : s.relayAddress ? (
-        <>
-          <CopyRow label="Friends connect to" addr={s.relayAddress} pill={relayPill} />
-          <button
-            onClick={stopSharing}
-            className="text-[11px] text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
-          >
-            change / stop sharing
-          </button>
-        </>
+        <div className="space-y-2">
+          <CopyRow label="Friends connect to" addr={addr!} pill={reachableConfirmed ? reachablePill : forwardedPill} />
+          <div className="flex flex-wrap items-center gap-3">
+            {testBtn}
+            {testLine}
+          </div>
+        </div>
       ) : (
-        <RelaySetup s={s} relay={relay} port={port} proto={proto} onChanged={onChanged} />
+        <div className="space-y-2">
+          {addr && (
+            <CopyRow
+              label="Your address"
+              addr={addr}
+              pill={<span className="text-[11px] text-amber-300">unverified</span>}
+            />
+          )}
+          <p className="text-xs text-zinc-400">
+            Click <span className="text-zinc-200">Test connection</span> to check whether friends can already reach you. If
+            not, let them connect <span className="text-zinc-200">directly</span> (nothing extra running) by signing in to
+            your router and forwarding{" "}
+            <span className="text-zinc-200">
+              port {port} ({proto})
+            </span>{" "}
+            to this PC
+            {conn?.localIP ? (
+              <>
+                {" "}
+                at <code className="text-zinc-200">{conn.localIP}</code>
+              </>
+            ) : null}
+            — or use a relay below (no router setup).
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            {testBtn}
+            {testLine}
+          </div>
+        </div>
       )}
+
+      <div className="border-t border-zinc-800 pt-3">
+        {s.relayAddress ? (
+          <div className="space-y-1">
+            <CopyRow label="Or via relay" addr={s.relayAddress} pill={relayPill} />
+            <button
+              onClick={stopSharing}
+              className="text-[11px] text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+            >
+              change / stop relay
+            </button>
+          </div>
+        ) : (
+          <details>
+            <summary className="cursor-pointer text-xs text-zinc-400 hover:text-zinc-200">
+              No router access? Share via a relay instead →
+            </summary>
+            <div className="mt-2">
+              <RelaySetup s={s} relay={relay} port={port} proto={proto} onChanged={onChanged} />
+            </div>
+          </details>
+        )}
+      </div>
     </div>
   );
 }
@@ -323,7 +434,7 @@ export function ServerDetail({
             <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
               Connection &amp; sharing
             </h3>
-            <ShareSection s={server} relay={relay} onChanged={onChanged} />
+            <ConnectionPanel s={server} relay={relay} onChanged={onChanged} />
           </section>
 
           {/* Settings */}
