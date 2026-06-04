@@ -1,0 +1,30 @@
+id: factorio
+name: Factorio
+game: factorio
+category: Sandbox
+description: >-
+  Build and defend sprawling automated factories, solo or co-op. Headless
+  dedicated server with auto-saving; a new map is generated on first start and
+  mods can be added later via the file manager.
+icon: factorio
+image: factoriotools/factorio:stable
+runtime: factorio
+stopCommand: ""
+dataPath: /factorio
+commandMethod: ""
+minMemoryMB: 1024
+recMemoryMB: 2048
+ports:
+  - name: game
+    container: 34197
+    protocol: udp
+    default: 34197
+env:
+  GENERATE_NEW_SAVE: "true"
+  SAVE_NAME: gamehost
+variables:
+  - key: SAVE_NAME
+    label: Save name
+    default: gamehost
+    type: string
+    required: false

@@ -1,0 +1,34 @@
+id: satisfactory
+name: Satisfactory
+game: satisfactory
+category: Sandbox
+description: >-
+  Co-op first-person factory building on an alien planet. Dedicated server
+  (wolveix) — once it's running, add and claim it from the in-game Server
+  Manager. RAM-hungry: 8 GB+ recommended.
+icon: satisfactory
+image: wolveix/satisfactory-server:latest
+runtime: steamcmd
+stopCommand: ""
+dataPath: /config
+commandMethod: ""
+minMemoryMB: 4096
+recMemoryMB: 8192
+ports:
+  - name: game-udp
+    container: 7777
+    protocol: udp
+    default: 7777
+  - name: game-tcp
+    container: 7777
+    protocol: tcp
+    default: 7777
+env:
+  PUID: "1000"
+  PGID: "1000"
+variables:
+  - key: MAXPLAYERS
+    label: Max players
+    default: "4"
+    type: string
+    required: false

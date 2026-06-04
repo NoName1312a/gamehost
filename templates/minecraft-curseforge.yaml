@@ -1,0 +1,48 @@
+id: minecraft-curseforge
+name: Minecraft Modpack (CurseForge)
+game: minecraft
+category: Modded
+description: >-
+  Run any CurseForge modpack (All the Mods, RLCraft, etc.) — paste the modpack
+  page URL plus a free CurseForge API key and GameHost auto-installs it. The key
+  is required by CurseForge for automatic downloads.
+icon: minecraft
+image: itzg/minecraft-server:latest
+runtime: java
+stopCommand: stop
+dataPath: /data
+commandMethod: rcon-cli
+minMemoryMB: 3072
+recMemoryMB: 6144
+ports:
+  - name: game
+    container: 25565
+    protocol: tcp
+    default: 25565
+env:
+  EULA: "TRUE"
+  TYPE: AUTO_CURSEFORGE
+variables:
+  - key: CF_PAGE_URL
+    label: CurseForge modpack URL
+    description: e.g. https://www.curseforge.com/minecraft/modpacks/all-the-mods-9
+    default: ""
+    type: string
+    required: true
+  - key: CF_API_KEY
+    label: CurseForge API key
+    description: Free from console.curseforge.com — required by CurseForge for auto-downloads
+    default: ""
+    type: string
+    required: true
+  - key: MEMORY
+    label: Java heap
+    description: JVM heap, e.g. 4G — keep it a bit below the Memory (MB) setting
+    default: 4G
+    type: string
+    required: false
+  - key: MOTD
+    label: Server message (MOTD)
+    default: A GameHost modpack server
+    type: string
+    required: false

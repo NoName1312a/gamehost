@@ -1,0 +1,44 @@
+id: enshrouded
+name: Enshrouded
+game: enshrouded
+category: Survival
+description: >-
+  Survival-crafting voxel action-RPG for up to 16 players. Dedicated server
+  (mornedhels) with auto-saving. RAM-hungry: 8 GB+ recommended.
+icon: enshrouded
+image: mornedhels/enshrouded-server:latest
+runtime: steamcmd
+stopCommand: ""
+dataPath: /opt/enshrouded
+commandMethod: ""
+minMemoryMB: 6144
+recMemoryMB: 8192
+ports:
+  - name: game
+    container: 15637
+    protocol: udp
+    default: 15637
+  - name: query
+    container: 15636
+    protocol: udp
+    default: 15636
+env:
+  PUID: "4711"
+  PGID: "4711"
+variables:
+  - key: SERVER_NAME
+    label: Server name
+    default: A GameHost Enshrouded server
+    type: string
+    required: false
+  - key: SERVER_PASSWORD
+    label: Server password
+    description: Players need this to join (leave blank for open)
+    default: ""
+    type: string
+    required: false
+  - key: SERVER_SLOT_COUNT
+    label: Player slots (1-16)
+    default: "8"
+    type: string
+    required: false
