@@ -118,6 +118,12 @@ export interface Reachable {
   detail: string;
 }
 
+export interface FileEntry {
+  name: string;
+  isDir: boolean;
+  size: number;
+}
+
 export interface ServerSummary {
   id: string;
   name: string;
@@ -195,6 +201,16 @@ export const api = {
     send<{ status: string }>("PUT", `/api/servers/${id}/relay-address`, { address }),
   connectivity: (id: string) => get<Connectivity>(`/api/servers/${id}/connectivity`),
   testConnectivity: (id: string) => send<Reachable>("POST", `/api/servers/${id}/connectivity/test`),
+  listFiles: (id: string, path: string) =>
+    get<{ path: string; entries: FileEntry[] }>(`/api/servers/${id}/files?path=${encodeURIComponent(path)}`),
+  readFile: (id: string, path: string) =>
+    get<{ path: string; content: string; truncated: boolean }>(`/api/servers/${id}/files/read?path=${encodeURIComponent(path)}`),
+  writeFile: (id: string, path: string, content: string) =>
+    send<{ status: string }>("PUT", `/api/servers/${id}/files`, { path, content }),
+  makeDir: (id: string, path: string) =>
+    send<{ status: string }>("POST", `/api/servers/${id}/files/mkdir`, { path }),
+  deleteFile: (id: string, path: string) =>
+    send<{ status: string }>("DELETE", `/api/servers/${id}/files?path=${encodeURIComponent(path)}`),
   templates: () => get<Template[]>("/api/templates"),
   servers: () => get<ServerSummary[]>("/api/servers"),
   createServer: (req: CreateServerRequest) => send<ServerSummary>("POST", "/api/servers", req),

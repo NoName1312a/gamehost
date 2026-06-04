@@ -8,6 +8,7 @@ import {
   type Template,
 } from "../lib/api";
 import { ServerConsole } from "./ServerConsole";
+import { FileManager } from "./FileManager";
 
 // Button styles shared within this page.
 const primaryBtn =
@@ -361,6 +362,7 @@ export function ServerDetail({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [showConsole, setShowConsole] = useState(false);
+  const [showFiles, setShowFiles] = useState(false);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -419,6 +421,9 @@ export function ServerDetail({
             )}
             <button onClick={() => setShowConsole(true)} className={ghostBtn}>
               Open console
+            </button>
+            <button onClick={() => setShowFiles(true)} className={ghostBtn}>
+              Files
             </button>
             <button
               onClick={onDelete}
@@ -532,6 +537,7 @@ export function ServerDetail({
       </div>
 
       {showConsole && <ServerConsole server={server} onClose={() => setShowConsole(false)} />}
+      {showFiles && <FileManager server={server} onClose={() => setShowFiles(false)} />}
     </div>
   );
 }

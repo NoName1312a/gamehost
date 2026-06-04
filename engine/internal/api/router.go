@@ -66,6 +66,11 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 		r.Put("/servers/{id}/relay-address", a.setRelayAddress)
 		r.Get("/servers/{id}/connectivity", a.connectivity)
 		r.Post("/servers/{id}/connectivity/test", a.connectivityTest)
+		r.Get("/servers/{id}/files", a.listFiles)
+		r.Get("/servers/{id}/files/read", a.readFile)
+		r.Put("/servers/{id}/files", a.writeFile)
+		r.Post("/servers/{id}/files/mkdir", a.makeDir)
+		r.Delete("/servers/{id}/files", a.deleteFile)
 		r.Get("/servers/{id}/console", a.console) // WebSocket
 		r.Post("/servers/{id}/start", a.startServer)
 		r.Post("/servers/{id}/stop", a.stopServer)
