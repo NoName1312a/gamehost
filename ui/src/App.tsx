@@ -8,7 +8,8 @@ import {
   type Template,
   type ServerSummary,
 } from "./lib/api";
-import { CreateServerModal } from "./components/CreateServerModal";
+import { ConfigureServerModal } from "./components/ConfigureServerModal";
+import { groupGames, type GameGroup } from "./lib/games";
 import { ServerDetail } from "./components/ServerDetail";
 import { SetupWizard } from "./components/SetupWizard";
 import { Settings } from "./components/Settings";
@@ -216,6 +217,36 @@ function ServerCard({
   );
 }
 
+// A game card in the library: one per game (Minecraft groups its editions).
+// Clicking it opens the configure flow.
+function GameCard({ group, disabled, onClick }: { group: GameGroup; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={disabled ? "Finish Docker setup first" : ""}
+      className="group flex flex-col rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 text-left transition hover:-translate-y-0.5 hover:border-zinc-600 hover:bg-zinc-900/70 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:border-zinc-800 disabled:hover:bg-zinc-900/40"
+    >
+      <div className="flex items-start justify-between">
+        <div className={`grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br ${group.gradient} text-2xl shadow-lg`}>
+          {group.glyph}
+        </div>
+        {group.templates.length > 1 && (
+          <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 ring-1 ring-inset ring-zinc-700">
+            {group.templates.length} editions
+          </span>
+        )}
+      </div>
+      <h3 className="mt-4 font-semibold text-zinc-100">{group.name}</h3>
+      <p className="mt-1 flex-1 text-sm text-zinc-400">{group.blurb}</p>
+      <div className="mt-4 flex items-center justify-between">
+        <Badge className={accentFor(group.category)}>{group.category}</Badge>
+        <span className="text-sm font-medium text-emerald-400 group-hover:text-emerald-300">Configure →</span>
+      </div>
+    </button>
+  );
+}
+
 // ---- app -------------------------------------------------------------------
 
 export default function App() {
@@ -236,7 +267,7 @@ export default function App() {
   const templates = useAsync<Template[]>(api.templates, nonce);
   const { servers, refresh } = useServers(health.status === "ok");
 
-  const [modalTemplate, setModalTemplate] = useState<Template | null>(null);
+  const [configureGroup, setConfigureGroup] = useState<GameGroup | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
@@ -333,48 +364,28 @@ export default function App() {
 
       {/* Game library */}
       <section className="px-6 py-8">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-          Game library
-        </h2>
+        <h2 className="text-lg font-semibold text-zinc-100">Add a server</h2>
+        <p className="mb-4 mt-0.5 text-sm text-zinc-500">Pick a game to configure and deploy a new server.</p>
         {templates.status === "loading" && <p className="text-sm text-zinc-500">Loading games…</p>}
         {templates.status === "error" && (
           <p className="text-sm text-rose-400">Couldn't load templates: {templates.error}</p>
         )}
         {templates.status === "ok" && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {templates.data.map((t) => (
-              <div key={t.id} className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-zinc-100">{t.name}</h3>
-                  <Badge className={accentFor(t.category)}>{t.category}</Badge>
-                </div>
-                <p className="mt-2 flex-1 text-sm text-zinc-400">{t.description}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                  <Badge className="bg-zinc-800 text-zinc-300 ring-zinc-700">{t.runtime}</Badge>
-                  <span>·</span>
-                  <span>{t.recMemoryMB} MB rec.</span>
-                </div>
-                <button
-                  onClick={() => setModalTemplate(t)}
-                  disabled={!runtimeReady}
-                  title={runtimeReady ? "" : "Set up Docker first"}
-                  className="mt-4 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-zinc-800/40 disabled:text-zinc-500"
-                >
-                  + Add server
-                </button>
-              </div>
+            {groupGames(templates.data).map((g) => (
+              <GameCard key={g.game} group={g} disabled={!runtimeReady} onClick={() => setConfigureGroup(g)} />
             ))}
           </div>
         )}
       </section>
 
       {/* Overlays */}
-      {modalTemplate && (
-        <CreateServerModal
-          template={modalTemplate}
-          onClose={() => setModalTemplate(null)}
+      {configureGroup && (
+        <ConfigureServerModal
+          group={configureGroup}
+          onClose={() => setConfigureGroup(null)}
           onCreated={() => {
-            setModalTemplate(null);
+            setConfigureGroup(null);
             refresh();
           }}
         />
