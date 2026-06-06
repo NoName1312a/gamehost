@@ -1,0 +1,38 @@
+id: necesse
+name: Necesse
+game: necesse
+category: Survival
+description: >-
+  Top-down survival/colony game with co-op expeditions. Lightweight dedicated
+  server.
+icon: necesse
+steamAppId: 1169040
+image: andreasgl4ser/necesse-server:latest
+runtime: java
+stopCommand: ""
+dataPath: /home/necesse/.config/Necesse
+commandMethod: ""
+minMemoryMB: 1024
+recMemoryMB: 2048
+ports:
+  - name: game
+    container: 14159
+    protocol: udp
+    default: 14159
+env: {}
+variables:
+  - key: WORLD_NAME
+    label: World name
+    default: gamehost
+    type: string
+    required: false
+  - key: SLOTS
+    label: Player slots
+    default: "10"
+    type: string
+    required: false
+  - key: PASSWORD
+    label: Server password
+    default: ""
+    type: string
+    required: false

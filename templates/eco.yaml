@@ -1,0 +1,33 @@
+id: eco
+name: Eco
+game: eco
+category: Simulation
+description: >-
+  Collaborative eco-civilization sim — build a society without wrecking the
+  ecosystem. Needs a free server token from play.eco.
+icon: eco
+steamAppId: 382310
+image: strangeloopgames/eco-game-server:latest
+runtime: native
+stopCommand: ""
+dataPath: /app
+commandMethod: ""
+minMemoryMB: 3072
+recMemoryMB: 4096
+ports:
+  - name: game
+    container: 3000
+    protocol: udp
+    default: 3000
+  - name: web
+    container: 3001
+    protocol: tcp
+    default: 3001
+env: {}
+variables:
+  - key: ECO_TOKEN
+    label: Eco server token
+    description: Required — create a server at play.eco to get a token
+    default: ""
+    type: string
+    required: true

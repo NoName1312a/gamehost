@@ -1,0 +1,31 @@
+id: mordhau
+name: Mordhau
+game: mordhau
+category: Shooter
+description: >-
+  Medieval melee combat multiplayer. Dedicated server (cm2network), auto-updates
+  on start.
+icon: mordhau
+steamAppId: 629760
+image: cm2network/mordhau:latest
+runtime: steamcmd
+stopCommand: ""
+dataPath: /home/steam/mordhau-dedicated
+commandMethod: ""
+minMemoryMB: 2048
+recMemoryMB: 4096
+ports:
+  - name: game
+    container: 7777
+    protocol: udp
+    default: 7777
+  - name: query
+    container: 27015
+    protocol: udp
+    default: 27015
+  - name: beacon
+    container: 15000
+    protocol: udp
+    default: 15000
+env: {}
+variables: []

@@ -1,0 +1,31 @@
+id: squad
+name: Squad
+game: squad
+category: Shooter
+description: >-
+  Large-scale 100-player tactical military FPS. Dedicated server (cm2network);
+  edit config under the data folder via the file manager.
+icon: squad
+steamAppId: 393380
+image: cm2network/squad:latest
+runtime: steamcmd
+stopCommand: ""
+dataPath: /home/steam/squad-dedicated
+commandMethod: ""
+minMemoryMB: 4096
+recMemoryMB: 8192
+ports:
+  - name: game
+    container: 7787
+    protocol: udp
+    default: 7787
+  - name: query
+    container: 27165
+    protocol: udp
+    default: 27165
+  - name: rcon
+    container: 21114
+    protocol: tcp
+    default: 21114
+env: {}
+variables: []

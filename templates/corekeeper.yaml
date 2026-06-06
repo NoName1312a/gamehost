@@ -1,0 +1,34 @@
+id: corekeeper
+name: Core Keeper
+game: corekeeper
+category: Survival
+description: >-
+  Underground sandbox mining and survival co-op for up to 8 players. Dedicated
+  server (escaping).
+icon: corekeeper
+steamAppId: 1621690
+image: escaping/core-keeper-dedicated:latest
+runtime: steamcmd
+stopCommand: ""
+dataPath: /home/steam/core-keeper-data
+commandMethod: ""
+minMemoryMB: 2048
+recMemoryMB: 4096
+ports:
+  - name: game
+    container: 27015
+    protocol: udp
+    default: 27015
+env:
+  SERVER_PORT: "27015"
+variables:
+  - key: NAME
+    label: Server name
+    default: A GameHost Core Keeper server
+    type: string
+    required: false
+  - key: MAX_PLAYERS
+    label: Max players
+    default: "8"
+    type: string
+    required: false

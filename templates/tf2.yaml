@@ -1,0 +1,48 @@
+id: tf2
+name: Team Fortress 2
+game: tf2
+category: Shooter
+description: >-
+  Classic class-based multiplayer shooter. Source dedicated server (cm2network).
+  A GSLT token (optional) lists it publicly.
+icon: tf2
+steamAppId: 440
+image: cm2network/tf2:latest
+runtime: steamcmd
+stopCommand: ""
+dataPath: /home/steam/tf-dedicated
+commandMethod: ""
+minMemoryMB: 1024
+recMemoryMB: 2048
+ports:
+  - name: game
+    container: 27015
+    protocol: udp
+    default: 27015
+  - name: game-tcp
+    container: 27015
+    protocol: tcp
+    default: 27015
+  - name: sourcetv
+    container: 27020
+    protocol: udp
+    default: 27020
+env: {}
+variables:
+  - key: SRCDS_HOSTNAME
+    label: Server name
+    default: A GameHost TF2 server
+    type: string
+    required: false
+  - key: SRCDS_RCONPW
+    label: RCON password
+    description: For remote admin commands
+    default: ""
+    type: string
+    required: false
+  - key: SRCDS_TOKEN
+    label: GSLT token (optional)
+    description: Game Server Login Token from steamcommunity.com/dev/managegameservers — needed to show in the public server browser
+    default: ""
+    type: string
+    required: false

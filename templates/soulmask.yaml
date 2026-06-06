@@ -1,0 +1,43 @@
+id: soulmask
+name: Soulmask
+game: soulmask
+category: Survival
+description: >-
+  Tribal survival-crafting in a mysterious ancient world — tame NPCs and beasts.
+  Dedicated server; heavy RAM.
+icon: soulmask
+steamAppId: 2646460
+image: sknnr/soulmask-dedicated-server:latest
+runtime: wine
+stopCommand: ""
+dataPath: /home/steam/soulmask
+commandMethod: ""
+minMemoryMB: 6144
+recMemoryMB: 8192
+ports:
+  - name: game
+    container: 8777
+    protocol: udp
+    default: 8777
+  - name: query
+    container: 27015
+    protocol: udp
+    default: 27015
+  - name: rcon
+    container: 18888
+    protocol: tcp
+    default: 18888
+env:
+  PUID: "10000"
+  PGID: "10000"
+variables:
+  - key: SERVER_NAME
+    label: Server name
+    default: A GameHost Soulmask server
+    type: string
+    required: false
+  - key: SERVER_PASSWORD
+    label: Server password
+    default: ""
+    type: string
+    required: false

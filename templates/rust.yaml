@@ -1,0 +1,49 @@
+id: rust
+name: Rust
+game: rust
+category: Survival
+description: >-
+  Hardcore open-world survival PvP. SteamCMD dedicated server with web RCON.
+  Very RAM-hungry — 8 GB+ (16 GB for big maps).
+icon: rust
+steamAppId: 252490
+image: didstopia/rust-server:latest
+runtime: steamcmd
+stopCommand: ""
+dataPath: /steamcmd/rust
+commandMethod: ""
+minMemoryMB: 4096
+recMemoryMB: 8192
+ports:
+  - name: game
+    container: 28015
+    protocol: udp
+    default: 28015
+  - name: rcon
+    container: 28016
+    protocol: tcp
+    default: 28016
+env: {}
+variables:
+  - key: RUST_SERVER_NAME
+    label: Server name
+    default: A GameHost Rust server
+    type: string
+    required: false
+  - key: RUST_RCON_PASSWORD
+    label: RCON password
+    description: Set a strong password for remote admin
+    default: ""
+    type: string
+    required: true
+  - key: RUST_SERVER_MAXPLAYERS
+    label: Max players
+    default: "50"
+    type: string
+    required: false
+  - key: RUST_SERVER_WORLDSIZE
+    label: World size
+    description: Map size, e.g. 3000 (smaller = less RAM)
+    default: "3000"
+    type: string
+    required: false

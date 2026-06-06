@@ -36,22 +36,24 @@ type Variable struct {
 
 // Template is a single game definition.
 type Template struct {
-	ID          string            `yaml:"id" json:"id"`
-	Name        string            `yaml:"name" json:"name"`
-	Game        string            `yaml:"game" json:"game"`
-	Category    string            `yaml:"category" json:"category"`
-	Description string            `yaml:"description" json:"description"`
-	Icon        string            `yaml:"icon" json:"icon"`
-	Image       string            `yaml:"image" json:"image"`
-	Runtime     string            `yaml:"runtime" json:"runtime"` // java | steamcmd | custom
-	StopCommand string            `yaml:"stopCommand" json:"stopCommand"`
-	DataPath    string            `yaml:"dataPath" json:"dataPath"`           // in-container path to persist (volume mount)
-	CommandMethod string          `yaml:"commandMethod" json:"commandMethod"` // rcon-cli | stdin | none
-	MinMemoryMB int               `yaml:"minMemoryMB" json:"minMemoryMB"`
-	RecMemoryMB int               `yaml:"recMemoryMB" json:"recMemoryMB"`
-	Ports       []Port            `yaml:"ports" json:"ports"`
-	Env         map[string]string `yaml:"env" json:"env"`
-	Variables   []Variable        `yaml:"variables" json:"variables"`
+	ID            string            `yaml:"id" json:"id"`
+	Name          string            `yaml:"name" json:"name"`
+	Game          string            `yaml:"game" json:"game"`
+	Category      string            `yaml:"category" json:"category"`
+	Description   string            `yaml:"description" json:"description"`
+	Icon          string            `yaml:"icon" json:"icon"`
+	SteamAppID    int               `yaml:"steamAppId,omitempty" json:"steamAppId,omitempty"` // for cover art
+	Cover         string            `yaml:"cover,omitempty" json:"cover,omitempty"`           // explicit cover URL override
+	Image         string            `yaml:"image" json:"image"`
+	Runtime       string            `yaml:"runtime" json:"runtime"` // java | steamcmd | custom
+	StopCommand   string            `yaml:"stopCommand" json:"stopCommand"`
+	DataPath      string            `yaml:"dataPath" json:"dataPath"`           // in-container path to persist (volume mount)
+	CommandMethod string            `yaml:"commandMethod" json:"commandMethod"` // rcon-cli | stdin | none
+	MinMemoryMB   int               `yaml:"minMemoryMB" json:"minMemoryMB"`
+	RecMemoryMB   int               `yaml:"recMemoryMB" json:"recMemoryMB"`
+	Ports         []Port            `yaml:"ports" json:"ports"`
+	Env           map[string]string `yaml:"env" json:"env"`
+	Variables     []Variable        `yaml:"variables" json:"variables"`
 }
 
 // Registry is an in-memory, concurrency-safe collection of templates loaded

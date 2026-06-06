@@ -7,6 +7,7 @@ description: >-
   dedicated server with auto-saving; a new map is generated on first start and
   mods can be added later via the file manager.
 icon: factorio
+steamAppId: 427520
 image: factoriotools/factorio:stable
 runtime: factorio
 stopCommand: ""

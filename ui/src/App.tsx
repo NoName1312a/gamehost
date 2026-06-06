@@ -65,6 +65,9 @@ const categoryAccent: Record<string, string> = {
   Sandbox: "text-emerald-400 bg-emerald-400/10 ring-emerald-400/20",
   Survival: "text-amber-400 bg-amber-400/10 ring-amber-400/20",
   Shooter: "text-rose-400 bg-rose-400/10 ring-rose-400/20",
+  Simulation: "text-sky-400 bg-sky-400/10 ring-sky-400/20",
+  Strategy: "text-violet-400 bg-violet-400/10 ring-violet-400/20",
+  Modded: "text-violet-400 bg-violet-400/10 ring-violet-400/20",
 };
 const accentFor = (c: string) =>
   categoryAccent[c] ?? "text-zinc-400 bg-zinc-400/10 ring-zinc-400/20";
@@ -225,6 +228,26 @@ function ServerCard({
   );
 }
 
+// The cover art for a game card: the real cover image, falling back to the
+// gradient tile + glyph if there's no cover or it fails to load.
+function GameCover({ group }: { group: GameGroup }) {
+  const [err, setErr] = useState(false);
+  if (group.cover && !err) {
+    return (
+      <img
+        src={group.cover}
+        alt=""
+        loading="lazy"
+        onError={() => setErr(true)}
+        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+      />
+    );
+  }
+  return (
+    <div className={`grid h-full w-full place-items-center bg-gradient-to-br ${group.gradient} text-5xl`}>{group.glyph}</div>
+  );
+}
+
 // A game card in the library: one per game (Minecraft groups its editions).
 // Clicking it opens the configure flow.
 function GameCard({ group, disabled, onClick }: { group: GameGroup; disabled: boolean; onClick: () => void }) {
@@ -233,23 +256,24 @@ function GameCard({ group, disabled, onClick }: { group: GameGroup; disabled: bo
       onClick={onClick}
       disabled={disabled}
       title={disabled ? "Finish Docker setup first" : ""}
-      className="group flex flex-col rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 text-left transition hover:-translate-y-0.5 hover:border-zinc-600 hover:bg-zinc-900/70 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:border-zinc-800 disabled:hover:bg-zinc-900/40"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/40 text-left transition hover:-translate-y-0.5 hover:border-zinc-600 hover:bg-zinc-900/70 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:border-zinc-800"
     >
-      <div className="flex items-start justify-between">
-        <div className={`grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br ${group.gradient} text-2xl shadow-lg`}>
-          {group.glyph}
-        </div>
+      <div className="relative aspect-[460/215] w-full overflow-hidden bg-zinc-900">
+        <GameCover group={group} />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-zinc-950/60 to-transparent" />
         {group.templates.length > 1 && (
-          <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 ring-1 ring-inset ring-zinc-700">
+          <span className="absolute right-2 top-2 rounded-full bg-zinc-950/70 px-2 py-0.5 text-[11px] text-zinc-100 ring-1 ring-inset ring-white/10 backdrop-blur">
             {group.templates.length} editions
           </span>
         )}
       </div>
-      <h3 className="mt-4 font-semibold text-zinc-100">{group.name}</h3>
-      <p className="mt-1 flex-1 text-sm text-zinc-400">{group.blurb}</p>
-      <div className="mt-4 flex items-center justify-between">
-        <Badge className={accentFor(group.category)}>{group.category}</Badge>
-        <span className="text-sm font-medium text-emerald-400 group-hover:text-emerald-300">Configure →</span>
+      <div className="flex flex-1 flex-col p-4">
+        <h3 className="font-semibold text-zinc-100">{group.name}</h3>
+        <p className="mt-1 line-clamp-2 flex-1 text-sm text-zinc-400">{group.blurb}</p>
+        <div className="mt-3 flex items-center justify-between">
+          <Badge className={accentFor(group.category)}>{group.category}</Badge>
+          <span className="text-sm font-medium text-emerald-400 group-hover:text-emerald-300">Configure →</span>
+        </div>
       </div>
     </button>
   );

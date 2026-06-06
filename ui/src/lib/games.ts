@@ -15,6 +15,18 @@ export interface GameMeta {
 export interface GameGroup extends GameMeta {
   game: string;
   templates: Template[];
+  cover?: string; // cover-art image URL (from a template's steamAppId / cover), if any
+}
+
+// Steam's public CDN header image, used as cover art for games on Steam.
+export function steamCover(appId: number): string {
+  return `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`;
+}
+
+function coverFor(t: Template): string {
+  if (t.cover) return t.cover;
+  if (t.steamAppId) return steamCover(t.steamAppId);
+  return "";
 }
 
 // Curated display metadata for the known games. Unknown games fall back to
@@ -109,7 +121,8 @@ export function groupGames(templates: Template[]): GameGroup[] {
       return am !== bm ? am - bm : a.name.localeCompare(b.name);
     });
     const meta = META[game] ?? deriveMeta(game, list[0]);
-    groups.push({ game, templates: list, ...meta });
+    const cover = list.map(coverFor).find((c) => c !== "") ?? "";
+    groups.push({ game, templates: list, cover, ...meta });
   }
   // Flagship first, then alphabetical.
   groups.sort((a, b) => (a.game === "minecraft" ? -1 : b.game === "minecraft" ? 1 : a.name.localeCompare(b.name)));

@@ -6,6 +6,7 @@ description: >-
   Counter-Strike 2 dedicated server (SteamCMD). For a public, internet-listed
   server you'll need a free Game Server Login Token (GSLT) from Steam.
 icon: cs2
+steamAppId: 730
 image: joedwards32/cs2:latest
 runtime: steamcmd
 stopCommand: ""

@@ -1,0 +1,46 @@
+id: ark-ascended
+name: ARK Survival Ascended
+game: ark-ascended
+category: Survival
+description: >-
+  Dinosaur-taming open-world survival (UE5 remaster). Proton dedicated server —
+  very heavy: 16 GB RAM and a slow first download.
+icon: ark-ascended
+steamAppId: 2399830
+image: sknnr/ark-ascended-server:latest
+runtime: wine
+stopCommand: ""
+dataPath: /home/steam/ark/ShooterGame/Saved
+commandMethod: ""
+minMemoryMB: 8192
+recMemoryMB: 16384
+ports:
+  - name: game
+    container: 7777
+    protocol: udp
+    default: 7777
+  - name: query
+    container: 27015
+    protocol: udp
+    default: 27015
+  - name: rcon
+    container: 27020
+    protocol: tcp
+    default: 27020
+env: {}
+variables:
+  - key: SESSION_NAME
+    label: Server name
+    default: A GameHost ARK server
+    type: string
+    required: false
+  - key: SERVER_PASSWORD
+    label: Server password
+    default: ""
+    type: string
+    required: false
+  - key: ADMIN_PASSWORD
+    label: Admin password
+    default: ""
+    type: string
+    required: false

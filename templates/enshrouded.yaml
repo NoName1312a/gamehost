@@ -6,6 +6,7 @@ description: >-
   Survival-crafting voxel action-RPG for up to 16 players. Dedicated server
   (mornedhels) with auto-saving. RAM-hungry: 8 GB+ recommended.
 icon: enshrouded
+steamAppId: 1203620
 image: mornedhels/enshrouded-server:latest
 runtime: steamcmd
 stopCommand: ""

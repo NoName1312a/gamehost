@@ -1,0 +1,26 @@
+id: unturned
+name: Unturned
+game: unturned
+category: Survival
+description: >-
+  Free blocky zombie-survival sandbox shooter. 64-bit Linux dedicated server.
+icon: unturned
+steamAppId: 304930
+image: imperialplugins/unturned:latest
+runtime: steamcmd
+stopCommand: ""
+dataPath: /home/steam/Unturned
+commandMethod: ""
+minMemoryMB: 1024
+recMemoryMB: 2048
+ports:
+  - name: game
+    container: 27015
+    protocol: udp
+    default: 27015
+  - name: query
+    container: 27016
+    protocol: udp
+    default: 27016
+env: {}
+variables: []

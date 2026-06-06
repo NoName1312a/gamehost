@@ -1,0 +1,22 @@
+id: veloren
+name: Veloren
+game: veloren
+category: Survival
+description: >-
+  Open-source voxel multiplayer action-RPG. Dedicated server; world generation on
+  first boot uses some CPU/RAM.
+icon: veloren
+image: florianpiesche/veloren-server:latest
+runtime: native
+stopCommand: ""
+dataPath: /saves
+commandMethod: ""
+minMemoryMB: 2048
+recMemoryMB: 4096
+ports:
+  - name: game
+    container: 14004
+    protocol: tcp
+    default: 14004
+env: {}
+variables: []

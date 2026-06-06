@@ -1,0 +1,27 @@
+id: vintagestory
+name: Vintage Story
+game: vintagestory
+category: Survival
+description: >-
+  Wilderness survival sandbox with deep crafting and exploration. Dedicated
+  server (devidian).
+icon: vintagestory
+image: devidian/vintagestory:latest
+runtime: native
+stopCommand: ""
+dataPath: /gamedata
+commandMethod: ""
+minMemoryMB: 1536
+recMemoryMB: 3072
+ports:
+  - name: game
+    container: 42420
+    protocol: tcp
+    default: 42420
+  - name: game-udp
+    container: 42420
+    protocol: udp
+    default: 42420
+env:
+  VS_DATA_PATH: /gamedata
+variables: []

@@ -1,0 +1,45 @@
+id: terraria
+name: Terraria
+game: terraria
+category: Sandbox
+description: >-
+  2D dig-fight-build-explore sandbox adventure. TShock dedicated server; a world
+  is generated on first start. Tiny footprint.
+icon: terraria
+steamAppId: 105600
+image: ryshe/terraria:latest
+runtime: native
+stopCommand: ""
+dataPath: /root/.local/share/Terraria/Worlds
+commandMethod: ""
+minMemoryMB: 512
+recMemoryMB: 1024
+ports:
+  - name: game
+    container: 7777
+    protocol: tcp
+    default: 7777
+env: {}
+variables:
+  - key: WORLD_FILENAME
+    label: World file name
+    default: gamehost.wld
+    type: string
+    required: false
+  - key: WORLD_SIZE
+    label: World size
+    description: 1 = small, 2 = medium, 3 = large
+    default: "2"
+    type: enum
+    options: ["1", "2", "3"]
+    required: false
+  - key: MAXPLAYERS
+    label: Max players
+    default: "8"
+    type: string
+    required: false
+  - key: PASSWORD
+    label: Server password
+    default: ""
+    type: string
+    required: false

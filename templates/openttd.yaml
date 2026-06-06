@@ -1,0 +1,27 @@
+id: openttd
+name: OpenTTD
+game: openttd
+category: Simulation
+description: >-
+  Open-source Transport Tycoon Deluxe — build road, rail, air and sea networks.
+  Multiplayer dedicated server.
+icon: openttd
+steamAppId: 1536610
+image: redditopenttd/openttd:latest
+runtime: native
+stopCommand: ""
+dataPath: /config
+commandMethod: ""
+minMemoryMB: 256
+recMemoryMB: 512
+ports:
+  - name: game
+    container: 3979
+    protocol: tcp
+    default: 3979
+  - name: game-udp
+    container: 3979
+    protocol: udp
+    default: 3979
+env: {}
+variables: []

@@ -83,6 +83,8 @@ export interface Template {
   category: string;
   description: string;
   icon: string;
+  steamAppId?: number;
+  cover?: string;
   image: string;
   runtime: string;
   stopCommand: string;

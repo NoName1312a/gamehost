@@ -6,6 +6,7 @@ description: >-
   Dedicated server for Palworld. SteamCMD-based; supports up to 32 players.
   Tip: Palworld is memory-hungry — 8 GB+ is recommended.
 icon: palworld
+steamAppId: 1623730
 image: thijsvanloef/palworld-server-docker:latest
 runtime: steamcmd
 stopCommand: ""

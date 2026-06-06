@@ -1,0 +1,34 @@
+id: dst
+name: Don't Starve Together
+game: dst
+category: Survival
+description: >-
+  Co-op wilderness survival (overworld + caves). Needs a free Klei cluster token
+  from accounts.klei.com to start.
+icon: dst
+steamAppId: 322330
+image: jamesits/dst-server:latest
+runtime: steamcmd
+stopCommand: ""
+dataPath: /data
+commandMethod: ""
+minMemoryMB: 1024
+recMemoryMB: 2048
+ports:
+  - name: master
+    container: 10999
+    protocol: udp
+    default: 10999
+  - name: caves
+    container: 11000
+    protocol: udp
+    default: 11000
+env:
+  DST_SERVER_ARCH: amd64
+variables:
+  - key: DST_CLUSTER_TOKEN
+    label: Klei cluster token
+    description: Required — generate at accounts.klei.com (Games → Don't Starve Together → Servers)
+    default: ""
+    type: string
+    required: true

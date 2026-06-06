@@ -6,6 +6,7 @@ description: >-
   Dedicated server for Valheim (up to 10 players). Built on SteamCMD; requires a
   server password of at least 5 characters.
 icon: valheim
+steamAppId: 892970
 image: lloesche/valheim-server:latest
 runtime: steamcmd
 stopCommand: ""

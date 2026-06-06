@@ -1,0 +1,26 @@
+id: insurgency
+name: Insurgency Sandstorm
+game: insurgency
+category: Shooter
+description: >-
+  Hardcore tactical FPS with co-op-vs-AI and PvP. SteamCMD dedicated server.
+icon: insurgency
+steamAppId: 581320
+image: andrewmhub/insurgency-sandstorm:latest
+runtime: steamcmd
+stopCommand: ""
+dataPath: /home/steam/steamcmd/sandstorm
+commandMethod: ""
+minMemoryMB: 2048
+recMemoryMB: 4096
+ports:
+  - name: game
+    container: 27102
+    protocol: udp
+    default: 27102
+  - name: query
+    container: 27131
+    protocol: udp
+    default: 27131
+env: {}
+variables: []

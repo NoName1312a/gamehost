@@ -1,0 +1,32 @@
+id: vrising
+name: V Rising
+game: vrising
+category: Survival
+description: >-
+  Vampire survival action-RPG for up to 40 players. Dedicated server (runs under
+  Wine); first boot is slow while it downloads.
+icon: vrising
+steamAppId: 1604030
+image: trueosiris/vrising:latest
+runtime: wine
+stopCommand: ""
+dataPath: /data
+commandMethod: ""
+minMemoryMB: 4096
+recMemoryMB: 6144
+ports:
+  - name: game
+    container: 9876
+    protocol: udp
+    default: 9876
+  - name: query
+    container: 9877
+    protocol: udp
+    default: 9877
+env: {}
+variables:
+  - key: SERVERNAME
+    label: Server name
+    default: A GameHost V Rising server
+    type: string
+    required: false

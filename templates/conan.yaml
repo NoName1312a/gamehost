@@ -1,0 +1,31 @@
+id: conan
+name: Conan Exiles
+game: conan
+category: Survival
+description: >-
+  Brutal open-world survival in the Conan universe — build, fight, and command
+  thralls. Wine dedicated server; heavy RAM and a large first download.
+icon: conan
+steamAppId: 440900
+image: indifferentbroccoli/conan-exiles-enhanced-server-docker:latest
+runtime: wine
+stopCommand: ""
+dataPath: /home/steam/conan-dedicated
+commandMethod: ""
+minMemoryMB: 6144
+recMemoryMB: 8192
+ports:
+  - name: game
+    container: 7777
+    protocol: udp
+    default: 7777
+  - name: raw
+    container: 7778
+    protocol: udp
+    default: 7778
+  - name: query
+    container: 27015
+    protocol: udp
+    default: 27015
+env: {}
+variables: []
