@@ -9,7 +9,7 @@ import {
   type ServerSummary,
 } from "./lib/api";
 import { ConfigureServerModal } from "./components/ConfigureServerModal";
-import { groupGames, type GameGroup } from "./lib/games";
+import { groupGames, gameMetaFor, type GameGroup } from "./lib/games";
 import { ServerDetail } from "./components/ServerDetail";
 import { SetupWizard } from "./components/SetupWizard";
 import { Settings } from "./components/Settings";
@@ -90,23 +90,27 @@ function statusStyle(status: string): string {
 
 function Header({ version, onSettings }: { version?: string; onSettings: () => void }) {
   return (
-    <header className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
+    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-zinc-800/80 bg-zinc-950/80 px-6 py-3.5 backdrop-blur">
       <div className="flex items-center gap-3">
-        <div className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-500 text-lg font-black text-zinc-950">
+        <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-lg font-black text-zinc-950 shadow-lg shadow-emerald-500/20">
           G
         </div>
         <div>
-          <h1 className="text-lg font-semibold leading-none text-zinc-100">GameHost</h1>
-          <p className="text-xs text-zinc-500">Self-host game servers, simply</p>
+          <h1 className="text-base font-semibold leading-none text-zinc-100">GameHost</h1>
+          <p className="mt-0.5 text-xs text-zinc-500">Self-host game servers, simply</p>
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        {version && <Badge className="bg-zinc-800 text-zinc-400 ring-zinc-700">engine {version}</Badge>}
+      <div className="flex items-center gap-2">
+        {version && (
+          <span className="rounded-full bg-zinc-800/80 px-2.5 py-1 text-xs text-zinc-400 ring-1 ring-inset ring-zinc-700/60">
+            engine {version}
+          </span>
+        )}
         <button
           onClick={onSettings}
           title="Settings"
           aria-label="Settings"
-          className="rounded-lg px-2 py-1.5 text-lg leading-none text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+          className="grid h-9 w-9 place-items-center rounded-xl text-lg leading-none text-zinc-400 ring-1 ring-inset ring-zinc-800 transition hover:bg-zinc-800/60 hover:text-zinc-200"
         >
           ⚙
         </button>
@@ -121,8 +125,8 @@ function ReadyBanner({ runtime }: { runtime: Async<Runtime> }) {
   if (runtime.status !== "ok" || !runtime.data.connected) return null;
   const { serverVersion } = runtime.data;
   return (
-    <div className="mx-6 mt-6 flex items-center gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-      <span className="h-2 w-2 rounded-full bg-emerald-400" />
+    <div className="mx-6 mt-6 flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+      <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
       <p className="text-sm text-emerald-200">
         Docker connected{serverVersion ? ` — engine v${serverVersion}` : ""}. You're ready to host.
       </p>
@@ -147,6 +151,7 @@ function ServerCard({
   onStop: () => void;
 }) {
   const port = s.ports?.[0]?.host;
+  const meta = gameMetaFor(s.game, s.name);
   return (
     <div
       role="button"
@@ -158,14 +163,17 @@ function ServerCard({
           onOpen();
         }
       }}
-      className="group cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 transition hover:border-zinc-700 hover:bg-zinc-900/70 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+      className="group cursor-pointer rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 transition hover:-translate-y-0.5 hover:border-zinc-600 hover:bg-zinc-900/70 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="font-semibold text-zinc-100">{s.name}</h3>
+      <div className="flex items-start gap-3">
+        <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${meta.gradient} text-lg`}>
+          {meta.glyph}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate font-semibold text-zinc-100">{s.name}</h3>
           <p className="text-xs text-zinc-500">
-            {s.game}
-            {port ? ` · port ${port}` : ""} · {s.memoryMB} MB
+            {port ? `port ${port} · ` : ""}
+            {s.memoryMB} MB
           </p>
         </div>
         <Badge className={statusStyle(s.pulling ? "downloading" : s.status)}>
@@ -313,7 +321,7 @@ export default function App() {
     <div className="mx-auto min-h-screen max-w-6xl">
       <Header version={version} onSettings={() => setShowSettings(true)} />
       {updateInfo && (
-        <div className="mx-6 mt-6 flex items-center justify-between gap-3 rounded-lg border border-sky-500/20 bg-sky-500/5 px-4 py-3">
+        <div className="mx-6 mt-6 flex items-center justify-between gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3">
           <p className="text-sm text-sky-200">
             GameHost <span className="font-semibold">v{updateInfo.version}</span> is available.
           </p>
@@ -334,9 +342,7 @@ export default function App() {
 
       {/* Servers */}
       <section className="px-6 pt-8">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-          Your servers
-        </h2>
+        <h2 className="mb-4 text-lg font-semibold text-zinc-100">Your servers</h2>
         {servers && servers.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {servers.map((s) => (
@@ -351,12 +357,15 @@ export default function App() {
             ))}
           </div>
         ) : (
-          <div className="grid place-items-center rounded-xl border border-dashed border-zinc-800 py-12 text-center">
-            <p className="text-zinc-400">No servers yet.</p>
+          <div className="grid place-items-center rounded-2xl border border-dashed border-zinc-800 py-14 text-center">
+            <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-900 text-2xl ring-1 ring-inset ring-zinc-800">
+              🎮
+            </div>
+            <p className="text-zinc-300">No servers yet.</p>
             <p className="mt-1 text-sm text-zinc-600">
               {runtimeReady
-                ? "Pick a game from the library below to create your first server."
-                : "Finish Docker setup above, then create a server from the library below."}
+                ? "Pick a game below to create your first server."
+                : "Finish Docker setup above, then create a server below."}
             </p>
           </div>
         )}

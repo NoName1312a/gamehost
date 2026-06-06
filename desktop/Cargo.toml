@@ -1,6 +1,6 @@
 [package]
 name = "gamehost-desktop"
-version = "0.2.0"
+version = "0.2.1"
 description = "GameHost desktop shell"
 authors = ["GameHost"]
 edition = "2021"

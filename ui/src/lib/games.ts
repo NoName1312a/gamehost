@@ -118,6 +118,16 @@ export function groupGames(templates: Template[]): GameGroup[] {
 
 // A short edition label for a template within a game group (e.g. the Minecraft
 // template "Minecraft (Java • Paper)" -> "Java • Paper").
+// gameMetaFor returns the display metadata for a game id (for server cards /
+// detail headers), falling back to a derived tile for unknown games.
+export function gameMetaFor(game: string, name: string): GameMeta {
+  const m = META[game];
+  if (m) return m;
+  let hash = 0;
+  for (const c of game) hash = (hash + c.charCodeAt(0)) % FALLBACK_GRADIENTS.length;
+  return { name, blurb: "", category: "Sandbox", gradient: FALLBACK_GRADIENTS[hash], glyph: (name[0] ?? "?").toUpperCase() };
+}
+
 export function editionLabel(group: GameGroup, t: Template): string {
   let s = t.name.replace(group.name, "").trim();
   if (s.startsWith("(") && s.endsWith(")")) s = s.slice(1, -1).trim(); // "(Java • Paper)" -> "Java • Paper"

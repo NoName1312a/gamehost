@@ -9,6 +9,7 @@ import {
   type Stats,
   type Template,
 } from "../lib/api";
+import { gameMetaFor } from "../lib/games";
 import { ServerConsole } from "./ServerConsole";
 import { FileManager } from "./FileManager";
 
@@ -627,6 +628,7 @@ export function ServerDetail({
     "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-emerald-500";
   const label = "mb-1 block text-xs font-medium text-zinc-400";
   const status = busy ?? server.status;
+  const meta = gameMetaFor(server.game, server.name);
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-zinc-950">
@@ -638,6 +640,9 @@ export function ServerDetail({
           >
             ← Back
           </button>
+          <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br ${meta.gradient} text-base`}>
+            {meta.glyph}
+          </div>
           <h2 className="font-semibold text-zinc-100">{server.name}</h2>
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${statusStyle(server.status)}`}
@@ -649,9 +654,9 @@ export function ServerDetail({
       </header>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl space-y-8 px-6 py-6">
+        <div className="mx-auto max-w-3xl space-y-5 px-6 py-6">
           {server.pulling && (
-            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
               <p className="text-sm text-emerald-200">First start — downloading game files… {server.pullPercent ?? 0}%</p>
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
                 <div
@@ -690,21 +695,21 @@ export function ServerDetail({
           </section>
 
           {/* Connection / share online */}
-          <section>
-            <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5">
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
               Connection &amp; sharing
             </h3>
             <ConnectionPanel s={server} relay={relay} onChanged={onChanged} />
           </section>
 
           {/* Resources */}
-          <section>
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5">
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Resources</h3>
             <ResourcesPanel s={server} />
           </section>
 
           {/* Settings */}
-          <section>
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5">
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Settings</h3>
             <form onSubmit={save} className="space-y-4">
               <div>
@@ -796,13 +801,13 @@ export function ServerDetail({
           </section>
 
           {/* Backups */}
-          <section>
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5">
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Backups</h3>
             <BackupsPanel s={server} />
           </section>
 
           {/* Schedules */}
-          <section>
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5">
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Schedules</h3>
             <SchedulesPanel s={server} onChanged={onChanged} />
           </section>
