@@ -703,15 +703,30 @@ func (m *Manager) RunScheduler(ctx context.Context) {
 			m.mu.RUnlock()
 			for _, id := range restarts {
 				fired["r:"+id] = stamp
-				go m.scheduledRestart(id)
+				safeGo("scheduled-restart:"+id, func() { m.scheduledRestart(id) })
 			}
 			for _, id := range backups {
 				fired["b:"+id] = stamp
-				go m.scheduledBackup(id)
+				safeGo("scheduled-backup:"+id, func() { m.scheduledBackup(id) })
 			}
 		}
 	}
 }
+
+// guard runs fn, recovering and logging any panic so a background task can't
+// take down the engine. Runs synchronously (use safeGo for a goroutine).
+func guard(name string, fn func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("background task panicked", "task", name, "panic", r)
+		}
+	}()
+	fn()
+}
+
+// safeGo runs fn in a goroutine under guard, so a panic in a scheduled task is
+// logged instead of crashing the process.
+func safeGo(name string, fn func()) { go guard(name, fn) }
 
 func (m *Manager) scheduledRestart(id string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
