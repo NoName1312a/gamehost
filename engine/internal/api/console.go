@@ -14,9 +14,22 @@ import (
 	"github.com/leop1/gamehost/engine/internal/server"
 )
 
-// dev: allow any origin (the engine binds to loopback). Tighten for server mode.
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+// originAllowed reports whether a WebSocket handshake's Origin is acceptable.
+// A missing Origin means a non-browser client (the desktop shell, curl) that
+// isn't subject to the browser same-origin policy, so it's allowed. A present
+// Origin (always sent by browsers) must exactly match the configured allow-list
+// — this is what blocks a malicious web page from hijacking the console.
+func originAllowed(r *http.Request, allowed []string) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	for _, a := range allowed {
+		if strings.EqualFold(origin, a) {
+			return true
+		}
+	}
+	return false
 }
 
 // console streams a server's live log output over a WebSocket and accepts
@@ -29,6 +42,9 @@ func (a *API) console(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return originAllowed(r, a.cfg.AllowOrigins) },
+	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
