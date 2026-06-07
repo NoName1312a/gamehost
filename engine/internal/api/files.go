@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -12,6 +13,31 @@ import (
 // File-manager endpoints let the UI browse and edit a server's data volume
 // (configs, mods, worlds). All operations go through the docker helper, so they
 // work whether or not the server is running.
+
+const (
+	// maxFileWriteBytes caps the body of a file-write request so a huge payload
+	// can't exhaust engine memory. Generous for text/config edits (reads are
+	// truncated at ~1 MiB), while bounding a malicious upload.
+	maxFileWriteBytes = 16 << 20 // 16 MiB
+	// maxControlBody caps small JSON control bodies (create/update/mkdir).
+	maxControlBody = 1 << 20 // 1 MiB
+)
+
+// decodeJSON caps the request body and decodes it as JSON, writing a 413/400
+// response and returning false if the body is too large or malformed.
+func decodeJSON(w http.ResponseWriter, r *http.Request, max int64, dst any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, max)
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, errMsg("request body too large"))
+			return false
+		}
+		writeJSON(w, http.StatusBadRequest, errMsg("invalid request body"))
+		return false
+	}
+	return true
+}
 
 func (a *API) serverVolume(w http.ResponseWriter, r *http.Request) (string, bool) {
 	s, ok := a.mgr.Get(chi.URLParam(r, "id"))
@@ -63,8 +89,7 @@ func (a *API) writeFile(w http.ResponseWriter, r *http.Request) {
 		Path    string `json:"path"`
 		Content string `json:"content"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, http.StatusBadRequest, errMsg("invalid request body"))
+	if !decodeJSON(w, r, maxFileWriteBytes, &body) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
@@ -84,8 +109,7 @@ func (a *API) makeDir(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Path string `json:"path"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, http.StatusBadRequest, errMsg("invalid request body"))
+	if !decodeJSON(w, r, maxControlBody, &body) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)

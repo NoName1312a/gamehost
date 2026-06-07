@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -19,8 +18,7 @@ func (a *API) listServers(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) createServer(w http.ResponseWriter, r *http.Request) {
 	var req server.CreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errMsg("invalid request body"))
+	if !decodeJSON(w, r, maxControlBody, &req) {
 		return
 	}
 	s, err := a.mgr.Create(req)
@@ -33,8 +31,7 @@ func (a *API) createServer(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) updateServer(w http.ResponseWriter, r *http.Request) {
 	var req server.UpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errMsg("invalid request body"))
+	if !decodeJSON(w, r, maxControlBody, &req) {
 		return
 	}
 	// Generous timeout: applying changes may stop, recreate, and restart the
