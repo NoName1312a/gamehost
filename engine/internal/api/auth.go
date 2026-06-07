@@ -16,12 +16,17 @@ const sessionTTL = 7 * 24 * time.Hour
 
 // isLoopback reports whether an http.Request RemoteAddr is a loopback address.
 func isLoopback(remoteAddr string) bool {
+	ip := net.ParseIP(clientIP(remoteAddr))
+	return ip != nil && ip.IsLoopback()
+}
+
+// clientIP strips the port from an http.Request RemoteAddr.
+func clientIP(remoteAddr string) string {
 	host, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
-		host = remoteAddr
+		return remoteAddr
 	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
+	return host
 }
 
 // sessionToken returns the caller's session token from the cookie or an
@@ -65,6 +70,11 @@ func (a *API) authStatus(w http.ResponseWriter, r *http.Request) {
 
 // authLogin verifies the operator password and sets a session cookie.
 func (a *API) authLogin(w http.ResponseWriter, r *http.Request) {
+	ip := clientIP(r.RemoteAddr)
+	if a.loginLimiter.blocked(ip, time.Now()) {
+		writeJSON(w, http.StatusTooManyRequests, errMsg("too many login attempts; please wait and try again"))
+		return
+	}
 	var body struct {
 		Password string `json:"password"`
 	}
@@ -72,9 +82,11 @@ func (a *API) authLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !a.auth.Verify(body.Password) {
+		a.loginLimiter.fail(ip, time.Now())
 		writeJSON(w, http.StatusUnauthorized, errMsg("incorrect password"))
 		return
 	}
+	a.loginLimiter.reset(ip)
 	tok := a.auth.CreateSession(sessionTTL)
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,

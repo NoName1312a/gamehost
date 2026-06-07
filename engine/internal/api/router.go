@@ -6,6 +6,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -33,15 +34,17 @@ type API struct {
 	mgr   *server.Manager
 	net    *network.Mapper
 	relay  *relay.Agent
-	auth   *auth.Store
-	remote *remote.Controller
-	audit  *audit.Logger
+	auth         *auth.Store
+	remote       *remote.Controller
+	audit        *audit.Logger
+	loginLimiter *loginLimiter
 }
 
 // NewRouter wires up the HTTP routes and middleware. It also hands the assembled
 // handler to the remote controller so the remote listener serves the same API.
 func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager, net *network.Mapper, rel *relay.Agent, au *auth.Store, rc *remote.Controller, al *audit.Logger) http.Handler {
-	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr, net: net, relay: rel, auth: au, remote: rc, audit: al}
+	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr, net: net, relay: rel, auth: au, remote: rc, audit: al,
+		loginLimiter: newLoginLimiter(5, 5*time.Minute)}
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)

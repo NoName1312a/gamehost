@@ -85,6 +85,28 @@ func TestHealthIsPublic(t *testing.T) {
 	}
 }
 
+func TestLoginThrottledAfterRepeatedFailures(t *testing.T) {
+	h, _, au := newTestAPI(t)
+	if err := au.SetPassword("password123"); err != nil {
+		t.Fatalf("set password: %v", err)
+	}
+	// The limiter allows 5 failures; the 6th attempt from the same IP is 429.
+	saw429 := false
+	for i := 0; i < 7; i++ {
+		rec := req(t, h, http.MethodPost, "/api/auth/login", remoteAddr, `{"password":"wrong"}`)
+		if rec.Code == http.StatusTooManyRequests {
+			saw429 = true
+			break
+		}
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: want 401, got %d", i, rec.Code)
+		}
+	}
+	if !saw429 {
+		t.Error("expected a 429 after repeated failed logins")
+	}
+}
+
 func TestRemoteAccessRequiresPassword(t *testing.T) {
 	h, _, _ := newTestAPI(t)
 	// Enabling remote access without an operator password is rejected.
