@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/leop1/gamehost/engine/internal/api"
+	"github.com/leop1/gamehost/engine/internal/auth"
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
 	"github.com/leop1/gamehost/engine/internal/network"
@@ -46,9 +47,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	authStore, err := auth.New(cfg.DataDir)
+	if err != nil {
+		slog.Error("failed to initialize auth store", "err", err)
+		os.Exit(1)
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.NewRouter(cfg, rt, reg, mgr, netMapper, relayAgent),
+		Handler:           api.NewRouter(cfg, rt, reg, mgr, netMapper, relayAgent, authStore),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

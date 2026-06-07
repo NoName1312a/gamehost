@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/leop1/gamehost/engine/internal/auth"
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
 	"github.com/leop1/gamehost/engine/internal/network"
@@ -30,11 +31,12 @@ type API struct {
 	mgr   *server.Manager
 	net   *network.Mapper
 	relay *relay.Agent
+	auth  *auth.Store
 }
 
 // NewRouter wires up the HTTP routes and middleware.
-func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager, net *network.Mapper, rel *relay.Agent) http.Handler {
-	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr, net: net, relay: rel}
+func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager, net *network.Mapper, rel *relay.Agent, au *auth.Store) http.Handler {
+	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr, net: net, relay: rel, auth: au}
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -48,39 +50,51 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 	}))
 
 	r.Route("/api", func(r chi.Router) {
+		// Public: liveness + the handshake needed to authenticate.
 		r.Get("/health", a.health)
-		r.Get("/system/runtime", a.runtime)
-		r.Get("/system/setup", a.setupReport)
-		r.Post("/system/setup/{step}", a.runSetupStep)
-		r.Get("/system/network", a.networkStatus)
-		r.Get("/system/relay", a.relayStatus)
-		r.Post("/system/relay/link", a.relayLink)
-		r.Post("/system/relay/{action}", a.relayAction)
+		r.Get("/auth/status", a.authStatus)
+		r.Post("/auth/login", a.authLogin)
 
-		r.Get("/templates", a.listTemplates)
-		r.Get("/templates/{id}", a.getTemplate)
+		// Protected: loopback is trusted; non-loopback needs a session.
+		r.Group(func(r chi.Router) {
+			r.Use(a.requireAuth)
 
-		r.Get("/servers", a.listServers)
-		r.Post("/servers", a.createServer)
-		r.Patch("/servers/{id}", a.updateServer)
-		r.Put("/servers/{id}/relay-address", a.setRelayAddress)
-		r.Get("/servers/{id}/connectivity", a.connectivity)
-		r.Post("/servers/{id}/connectivity/test", a.connectivityTest)
-		r.Get("/servers/{id}/files", a.listFiles)
-		r.Get("/servers/{id}/files/read", a.readFile)
-		r.Put("/servers/{id}/files", a.writeFile)
-		r.Post("/servers/{id}/files/mkdir", a.makeDir)
-		r.Delete("/servers/{id}/files", a.deleteFile)
-		r.Get("/servers/{id}/backups", a.listBackups)
-		r.Post("/servers/{id}/backups", a.createBackup)
-		r.Post("/servers/{id}/backups/restore", a.restoreBackup)
-		r.Delete("/servers/{id}/backups", a.deleteBackup)
-		r.Put("/servers/{id}/schedule", a.setSchedule)
-		r.Get("/servers/{id}/stats", a.serverStats)
-		r.Get("/servers/{id}/console", a.console) // WebSocket
-		r.Post("/servers/{id}/start", a.startServer)
-		r.Post("/servers/{id}/stop", a.stopServer)
-		r.Delete("/servers/{id}", a.deleteServer)
+			r.Post("/auth/logout", a.authLogout)
+			r.Post("/auth/password", a.authSetPassword)
+
+			r.Get("/system/runtime", a.runtime)
+			r.Get("/system/setup", a.setupReport)
+			r.Post("/system/setup/{step}", a.runSetupStep)
+			r.Get("/system/network", a.networkStatus)
+			r.Get("/system/relay", a.relayStatus)
+			r.Post("/system/relay/link", a.relayLink)
+			r.Post("/system/relay/{action}", a.relayAction)
+
+			r.Get("/templates", a.listTemplates)
+			r.Get("/templates/{id}", a.getTemplate)
+
+			r.Get("/servers", a.listServers)
+			r.Post("/servers", a.createServer)
+			r.Patch("/servers/{id}", a.updateServer)
+			r.Put("/servers/{id}/relay-address", a.setRelayAddress)
+			r.Get("/servers/{id}/connectivity", a.connectivity)
+			r.Post("/servers/{id}/connectivity/test", a.connectivityTest)
+			r.Get("/servers/{id}/files", a.listFiles)
+			r.Get("/servers/{id}/files/read", a.readFile)
+			r.Put("/servers/{id}/files", a.writeFile)
+			r.Post("/servers/{id}/files/mkdir", a.makeDir)
+			r.Delete("/servers/{id}/files", a.deleteFile)
+			r.Get("/servers/{id}/backups", a.listBackups)
+			r.Post("/servers/{id}/backups", a.createBackup)
+			r.Post("/servers/{id}/backups/restore", a.restoreBackup)
+			r.Delete("/servers/{id}/backups", a.deleteBackup)
+			r.Put("/servers/{id}/schedule", a.setSchedule)
+			r.Get("/servers/{id}/stats", a.serverStats)
+			r.Get("/servers/{id}/console", a.console) // WebSocket
+			r.Post("/servers/{id}/start", a.startServer)
+			r.Post("/servers/{id}/stop", a.stopServer)
+			r.Delete("/servers/{id}", a.deleteServer)
+		})
 	})
 
 	return r

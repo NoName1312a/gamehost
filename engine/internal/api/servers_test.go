@@ -10,7 +10,8 @@ import (
 	"github.com/leop1/gamehost/engine/internal/server"
 )
 
-// do is a small helper to issue a request against the real router.
+// do issues a request against the real router from a loopback address (the
+// trusted desktop case, so auth doesn't reject it).
 func do(t *testing.T, h http.Handler, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	var r *http.Request
@@ -19,13 +20,14 @@ func do(t *testing.T, h http.Handler, method, path, body string) *httptest.Respo
 	} else {
 		r = httptest.NewRequest(method, path, strings.NewReader(body))
 	}
+	r.RemoteAddr = "127.0.0.1:50000"
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, r)
 	return rec
 }
 
 func TestCreateServerReturnsCreated(t *testing.T) {
-	h, _ := newTestAPI(t)
+	h, _, _ := newTestAPI(t)
 	rec := do(t, h, http.MethodPost, "/api/servers", `{"templateId":"test-mc","name":"My MC","port":25565}`)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("want 201, got %d (%s)", rec.Code, rec.Body.String())
@@ -40,7 +42,7 @@ func TestCreateServerReturnsCreated(t *testing.T) {
 }
 
 func TestCreateServerRejectsUnknownTemplate(t *testing.T) {
-	h, _ := newTestAPI(t)
+	h, _, _ := newTestAPI(t)
 	rec := do(t, h, http.MethodPost, "/api/servers", `{"templateId":"nope","name":"X"}`)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("want 400 for unknown template, got %d (%s)", rec.Code, rec.Body.String())
@@ -48,7 +50,7 @@ func TestCreateServerRejectsUnknownTemplate(t *testing.T) {
 }
 
 func TestCreateServerRejectsDuplicatePort(t *testing.T) {
-	h, _ := newTestAPI(t)
+	h, _, _ := newTestAPI(t)
 	if rec := do(t, h, http.MethodPost, "/api/servers", `{"templateId":"test-mc","name":"A","port":25565}`); rec.Code != http.StatusCreated {
 		t.Fatalf("first create: want 201, got %d (%s)", rec.Code, rec.Body.String())
 	}
@@ -59,7 +61,7 @@ func TestCreateServerRejectsDuplicatePort(t *testing.T) {
 }
 
 func TestListAndDeleteServer(t *testing.T) {
-	h, mgr := newTestAPI(t)
+	h, mgr, _ := newTestAPI(t)
 	s, err := mgr.Create(server.CreateRequest{TemplateID: "test-mc", Name: "Listed", Port: 25565})
 	if err != nil {
 		t.Fatalf("seed create: %v", err)
@@ -91,7 +93,7 @@ func TestListAndDeleteServer(t *testing.T) {
 }
 
 func TestSetScheduleValidation(t *testing.T) {
-	h, mgr := newTestAPI(t)
+	h, mgr, _ := newTestAPI(t)
 	s, err := mgr.Create(server.CreateRequest{TemplateID: "test-mc", Name: "Sched", Port: 25565})
 	if err != nil {
 		t.Fatalf("seed create: %v", err)
