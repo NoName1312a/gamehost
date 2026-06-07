@@ -13,6 +13,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/auth"
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
+	"github.com/leop1/gamehost/engine/internal/license"
 	"github.com/leop1/gamehost/engine/internal/remote"
 	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/templates"
@@ -68,9 +69,14 @@ func newTestAPIFull(t *testing.T) (http.Handler, *server.Manager, *auth.Store, *
 		t.Fatalf("new auth: %v", err)
 	}
 	rc := remote.New(t.TempDir(), "127.0.0.1")
+	lic := license.NewStore(t.TempDir(), license.EmbeddedPublicKey())
 	var auditBuf bytes.Buffer
 	cfg := config.Config{AllowOrigins: []string{"http://localhost:5173"}}
-	return NewRouter(cfg, rt, reg, mgr, nil, nil, au, rc, audit.New(&auditBuf)), mgr, au, &auditBuf
+	h := NewRouter(Deps{
+		Cfg: cfg, RT: rt, Reg: reg, Mgr: mgr, Auth: au, Remote: rc,
+		Audit: audit.New(&auditBuf), License: lic,
+	})
+	return h, mgr, au, &auditBuf
 }
 
 // TestWriteFileRejectsOversizedBody verifies the file-write endpoint caps the

@@ -19,6 +19,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/auth"
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
+	"github.com/leop1/gamehost/engine/internal/license"
 	"github.com/leop1/gamehost/engine/internal/network"
 	"github.com/leop1/gamehost/engine/internal/relay"
 	"github.com/leop1/gamehost/engine/internal/remote"
@@ -62,9 +63,14 @@ func main() {
 		slog.Warn("audit log unavailable", "err", err) // non-fatal
 	}
 
+	licenseStore := license.NewStore(cfg.DataDir, license.EmbeddedPublicKey())
+
 	srv := &http.Server{
-		Addr:              cfg.Addr,
-		Handler:           api.NewRouter(cfg, rt, reg, mgr, netMapper, relayAgent, authStore, remoteCtrl, auditLog),
+		Addr: cfg.Addr,
+		Handler: api.NewRouter(api.Deps{
+			Cfg: cfg, RT: rt, Reg: reg, Mgr: mgr, Net: netMapper, Relay: relayAgent,
+			Auth: authStore, Remote: remoteCtrl, Audit: auditLog, License: licenseStore,
+		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

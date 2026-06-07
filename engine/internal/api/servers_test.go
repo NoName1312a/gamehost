@@ -112,6 +112,19 @@ func TestAuditLogsMutationsNotReads(t *testing.T) {
 	}
 }
 
+func TestLicenseStatusAndRejectsBadKey(t *testing.T) {
+	h, _, _ := newTestAPI(t)
+	// Default tier is free.
+	rec := do(t, h, http.MethodGet, "/api/license", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"pro":false`) {
+		t.Fatalf("license status: %d %s", rec.Code, rec.Body.String())
+	}
+	// A bogus key is rejected and stays free.
+	if rec := do(t, h, http.MethodPost, "/api/license", `{"key":"garbage"}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad license: want 400, got %d (%s)", rec.Code, rec.Body.String())
+	}
+}
+
 func TestSetScheduleValidation(t *testing.T) {
 	h, mgr, _ := newTestAPI(t)
 	s, err := mgr.Create(server.CreateRequest{TemplateID: "test-mc", Name: "Sched", Port: 25565})

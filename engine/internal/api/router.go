@@ -16,6 +16,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/auth"
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
+	"github.com/leop1/gamehost/engine/internal/license"
 	"github.com/leop1/gamehost/engine/internal/network"
 	"github.com/leop1/gamehost/engine/internal/relay"
 	"github.com/leop1/gamehost/engine/internal/remote"
@@ -26,31 +27,48 @@ import (
 // Version is the engine API version, surfaced at /api/health.
 const Version = "0.1.0-m1"
 
+// Deps bundles everything the router needs. Grouping them keeps the signature
+// stable as new subsystems (auth, remote, audit, license, …) are added.
+type Deps struct {
+	Cfg     config.Config
+	RT      *docker.Runtime
+	Reg     *templates.Registry
+	Mgr     *server.Manager
+	Net     *network.Mapper
+	Relay   *relay.Agent
+	Auth    *auth.Store
+	Remote  *remote.Controller
+	Audit   *audit.Logger
+	License *license.Store
+}
+
 // API bundles the dependencies handlers need.
 type API struct {
-	cfg   config.Config
-	rt    *docker.Runtime
-	reg   *templates.Registry
-	mgr   *server.Manager
-	net    *network.Mapper
-	relay  *relay.Agent
+	cfg          config.Config
+	rt           *docker.Runtime
+	reg          *templates.Registry
+	mgr          *server.Manager
+	net          *network.Mapper
+	relay        *relay.Agent
 	auth         *auth.Store
 	remote       *remote.Controller
 	audit        *audit.Logger
+	license      *license.Store
 	loginLimiter *loginLimiter
 }
 
 // NewRouter wires up the HTTP routes and middleware. It also hands the assembled
 // handler to the remote controller so the remote listener serves the same API.
-func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager, net *network.Mapper, rel *relay.Agent, au *auth.Store, rc *remote.Controller, al *audit.Logger) http.Handler {
-	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr, net: net, relay: rel, auth: au, remote: rc, audit: al,
+func NewRouter(d Deps) http.Handler {
+	a := &API{cfg: d.Cfg, rt: d.RT, reg: d.Reg, mgr: d.Mgr, net: d.Net, relay: d.Relay,
+		auth: d.Auth, remote: d.Remote, audit: d.Audit, license: d.License,
 		loginLimiter: newLoginLimiter(5, 5*time.Minute)}
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   cfg.AllowOrigins,
+		AllowedOrigins:   d.Cfg.AllowOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		AllowCredentials: false,
@@ -72,6 +90,10 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 
 			r.Post("/auth/logout", a.authLogout)
 			r.Post("/auth/password", a.authSetPassword)
+
+			r.Get("/license", a.licenseStatus)
+			r.Post("/license", a.setLicense)
+			r.Delete("/license", a.clearLicense)
 
 			r.Get("/system/runtime", a.runtime)
 			r.Get("/system/setup", a.setupReport)
@@ -110,8 +132,8 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 		})
 	})
 
-	if rc != nil {
-		rc.SetHandler(r)
+	if d.Remote != nil {
+		d.Remote.SetHandler(r)
 	}
 	return r
 }
