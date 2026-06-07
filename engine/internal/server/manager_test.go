@@ -395,24 +395,6 @@ func TestLoadRecoversFromBak(t *testing.T) {
 	}
 }
 
-func TestGuardRecoversPanic(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Fatalf("panic escaped guard: %v", r)
-		}
-	}()
-	guard("test-task", func() { panic("boom") })
-	// Reaching here means guard contained the panic instead of propagating it.
-}
-
-func TestGuardRunsFn(t *testing.T) {
-	ran := false
-	guard("test-task", func() { ran = true })
-	if !ran {
-		t.Fatal("guard did not run the function")
-	}
-}
-
 func TestDelete(t *testing.T) {
 	m, _ := newTestManager(t)
 	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "Doomed", Port: 25565})

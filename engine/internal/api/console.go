@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
 
+	"github.com/leop1/gamehost/engine/internal/safe"
 	"github.com/leop1/gamehost/engine/internal/server"
 )
 
@@ -39,8 +40,8 @@ func (a *API) console(w http.ResponseWriter, r *http.Request) {
 
 	out := make(chan string, 256)
 
-	// single writer
-	go func() {
+	// single writer — guarded so a write panic can't crash the whole engine.
+	safe.Go("console-writer:"+s.ID, func() {
 		for {
 			select {
 			case <-ctx.Done():
@@ -53,10 +54,10 @@ func (a *API) console(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-	}()
+	})
 
-	// log streamer
-	go func() {
+	// log streamer — guarded for the same reason.
+	safe.Go("console-logs:"+s.ID, func() {
 		reader, err := a.rt.LogsReader(ctx, s.ContainerName(), 200)
 		if err != nil {
 			send(ctx, out, "[gamehost] could not attach to the console: "+err.Error())
@@ -70,7 +71,7 @@ func (a *API) console(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-	}()
+	})
 
 	// read commands from the UI until the socket closes
 	for {
