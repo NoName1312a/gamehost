@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/leop1/gamehost/engine/internal/api"
+	"github.com/leop1/gamehost/engine/internal/audit"
 	"github.com/leop1/gamehost/engine/internal/auth"
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
@@ -56,9 +57,14 @@ func main() {
 
 	remoteCtrl := remote.New(cfg.DataDir, "0.0.0.0")
 
+	auditLog, err := audit.NewFile(cfg.DataDir)
+	if err != nil {
+		slog.Warn("audit log unavailable", "err", err) // non-fatal
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.NewRouter(cfg, rt, reg, mgr, netMapper, relayAgent, authStore, remoteCtrl),
+		Handler:           api.NewRouter(cfg, rt, reg, mgr, netMapper, relayAgent, authStore, remoteCtrl, auditLog),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

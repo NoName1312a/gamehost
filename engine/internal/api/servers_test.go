@@ -92,6 +92,26 @@ func TestListAndDeleteServer(t *testing.T) {
 	}
 }
 
+func TestAuditLogsMutationsNotReads(t *testing.T) {
+	h, _, _, auditBuf := newTestAPIFull(t)
+
+	// A mutating request is recorded with method, path, status, and actor.
+	do(t, h, http.MethodPost, "/api/servers", `{"templateId":"test-mc","name":"A","port":25565}`)
+	line := auditBuf.String()
+	for _, want := range []string{`"method":"POST"`, `"path":"/api/servers"`, `"status":201`, `"actor":"local"`} {
+		if !strings.Contains(line, want) {
+			t.Errorf("audit log missing %s:\n%s", want, line)
+		}
+	}
+
+	// A read (GET) is not recorded.
+	auditBuf.Reset()
+	do(t, h, http.MethodGet, "/api/servers", "")
+	if auditBuf.Len() != 0 {
+		t.Errorf("GET should not be audited, got:\n%s", auditBuf.String())
+	}
+}
+
 func TestSetScheduleValidation(t *testing.T) {
 	h, mgr, _ := newTestAPI(t)
 	s, err := mgr.Create(server.CreateRequest{TemplateID: "test-mc", Name: "Sched", Port: 25565})

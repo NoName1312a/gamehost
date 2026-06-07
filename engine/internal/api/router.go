@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/leop1/gamehost/engine/internal/audit"
 	"github.com/leop1/gamehost/engine/internal/auth"
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
@@ -34,12 +35,13 @@ type API struct {
 	relay  *relay.Agent
 	auth   *auth.Store
 	remote *remote.Controller
+	audit  *audit.Logger
 }
 
 // NewRouter wires up the HTTP routes and middleware. It also hands the assembled
 // handler to the remote controller so the remote listener serves the same API.
-func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager, net *network.Mapper, rel *relay.Agent, au *auth.Store, rc *remote.Controller) http.Handler {
-	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr, net: net, relay: rel, auth: au, remote: rc}
+func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager, net *network.Mapper, rel *relay.Agent, au *auth.Store, rc *remote.Controller, al *audit.Logger) http.Handler {
+	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr, net: net, relay: rel, auth: au, remote: rc, audit: al}
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -53,6 +55,9 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 	}))
 
 	r.Route("/api", func(r chi.Router) {
+		// Record mutating actions (covers login attempts too).
+		r.Use(a.auditMiddleware)
+
 		// Public: liveness + the handshake needed to authenticate.
 		r.Get("/health", a.health)
 		r.Get("/auth/status", a.authStatus)

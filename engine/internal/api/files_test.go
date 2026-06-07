@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leop1/gamehost/engine/internal/audit"
 	"github.com/leop1/gamehost/engine/internal/auth"
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
@@ -41,6 +43,12 @@ env:
 // routing) is exercised end-to-end through the real chi router. The auth store
 // is returned so tests can exercise login/session behavior.
 func newTestAPI(t *testing.T) (http.Handler, *server.Manager, *auth.Store) {
+	h, mgr, au, _ := newTestAPIFull(t)
+	return h, mgr, au
+}
+
+// newTestAPIFull is newTestAPI plus the audit buffer, for audit assertions.
+func newTestAPIFull(t *testing.T) (http.Handler, *server.Manager, *auth.Store, *bytes.Buffer) {
 	t.Helper()
 	tdir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tdir, "test-mc.yaml"), []byte(apiTestTemplate), 0o644); err != nil {
@@ -60,8 +68,9 @@ func newTestAPI(t *testing.T) (http.Handler, *server.Manager, *auth.Store) {
 		t.Fatalf("new auth: %v", err)
 	}
 	rc := remote.New(t.TempDir(), "127.0.0.1")
+	var auditBuf bytes.Buffer
 	cfg := config.Config{AllowOrigins: []string{"http://localhost:5173"}}
-	return NewRouter(cfg, rt, reg, mgr, nil, nil, au, rc), mgr, au
+	return NewRouter(cfg, rt, reg, mgr, nil, nil, au, rc, audit.New(&auditBuf)), mgr, au, &auditBuf
 }
 
 // TestWriteFileRejectsOversizedBody verifies the file-write endpoint caps the
