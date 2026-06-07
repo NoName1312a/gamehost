@@ -303,6 +303,98 @@ func TestValidHHMM(t *testing.T) {
 	}
 }
 
+func testRegistry(t *testing.T) *templates.Registry {
+	t.Helper()
+	tdir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tdir, "test-mc.yaml"), []byte(testTemplate), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reg := templates.NewRegistry(tdir)
+	if err := reg.Load(); err != nil {
+		t.Fatalf("load templates: %v", err)
+	}
+	return reg
+}
+
+// TestLoadMigratesLegacyArray verifies a v0 servers.json (a bare JSON array
+// with no schemaVersion wrapper) still loads, so existing installs survive the
+// format change.
+func TestLoadMigratesLegacyArray(t *testing.T) {
+	dataDir := t.TempDir()
+	legacy := `[{"id":"abc","name":"Legacy","templateId":"test-mc","memoryMB":2048,"createdAt":"2024-01-01T00:00:00Z"}]`
+	if err := os.WriteFile(filepath.Join(dataDir, "servers.json"), []byte(legacy), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m, err := NewManager(dataDir, &fakeRuntime{}, nil, nil, testRegistry(t))
+	if err != nil {
+		t.Fatalf("new manager over legacy file: %v", err)
+	}
+	got, ok := m.Get("abc")
+	if !ok || got.Name != "Legacy" {
+		t.Fatalf("legacy server not migrated: ok=%v got=%+v", ok, got)
+	}
+}
+
+// TestSaveWritesVersionedFormatAndBak verifies saves use the versioned wrapper
+// and rotate a .bak recovery copy of the previous good file.
+func TestSaveWritesVersionedFormatAndBak(t *testing.T) {
+	dataDir := t.TempDir()
+	m, err := NewManager(dataDir, &fakeRuntime{}, nil, nil, testRegistry(t))
+	if err != nil {
+		t.Fatalf("new manager: %v", err)
+	}
+	if _, err := m.Create(CreateRequest{TemplateID: "test-mc", Name: "One", Port: 25565}); err != nil {
+		t.Fatalf("create one: %v", err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dataDir, "servers.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"schemaVersion"`) {
+		t.Errorf("servers.json is not in versioned format:\n%s", raw)
+	}
+	// A second mutation rotates the prior good file to servers.json.bak.
+	if _, err := m.Create(CreateRequest{TemplateID: "test-mc", Name: "Two", Port: 25566}); err != nil {
+		t.Fatalf("create two: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "servers.json.bak")); err != nil {
+		t.Errorf("expected servers.json.bak after second save: %v", err)
+	}
+}
+
+// TestLoadRecoversFromBak verifies a corrupt main file is recovered from the
+// .bak copy instead of refusing to boot.
+func TestLoadRecoversFromBak(t *testing.T) {
+	dataDir := t.TempDir()
+	reg := testRegistry(t)
+	m, err := NewManager(dataDir, &fakeRuntime{}, nil, nil, reg)
+	if err != nil {
+		t.Fatalf("new manager: %v", err)
+	}
+	one, err := m.Create(CreateRequest{TemplateID: "test-mc", Name: "One", Port: 25565})
+	if err != nil {
+		t.Fatalf("create one: %v", err)
+	}
+	two, err := m.Create(CreateRequest{TemplateID: "test-mc", Name: "Two", Port: 25566})
+	if err != nil {
+		t.Fatalf("create two: %v", err)
+	}
+	// Corrupt the live file; .bak holds the state before the 2nd save (just One).
+	if err := os.WriteFile(filepath.Join(dataDir, "servers.json"), []byte("{ this is corrupt"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m2, err := NewManager(dataDir, &fakeRuntime{}, nil, nil, reg)
+	if err != nil {
+		t.Fatalf("expected recovery from .bak, got error: %v", err)
+	}
+	if _, ok := m2.Get(one.ID); !ok {
+		t.Errorf("recovered state missing server %q from .bak", one.ID)
+	}
+	if _, ok := m2.Get(two.ID); ok {
+		t.Errorf("did not expect server %q (it was only in the corrupt main file)", two.ID)
+	}
+}
+
 func TestGuardRecoversPanic(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {

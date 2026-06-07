@@ -155,17 +155,51 @@ func NewManager(dataDir string, rt Runtime, net Networking, rel Relay, reg *temp
 	return m, nil
 }
 
+// currentSchemaVersion is bumped when the on-disk Server shape changes in a way
+// that needs migration on load.
+const currentSchemaVersion = 1
+
+// fileFormat is the versioned on-disk wrapper for servers.json. Older installs
+// stored a bare JSON array (no wrapper); readServers migrates those.
+type fileFormat struct {
+	SchemaVersion int       `json:"schemaVersion"`
+	Servers       []*Server `json:"servers"`
+}
+
+// readServers parses a servers file in either the versioned wrapper format or
+// the legacy v0 bare-array format. A missing file returns os.ErrNotExist.
+func readServers(path string) ([]*Server, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	// Versioned format: {"schemaVersion":N,"servers":[...]}.
+	var ff fileFormat
+	if err := json.Unmarshal(b, &ff); err == nil && ff.SchemaVersion > 0 {
+		return ff.Servers, nil
+	}
+	// Legacy v0 format: a bare JSON array.
+	var list []*Server
+	if err := json.Unmarshal(b, &list); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	return list, nil
+}
+
 func (m *Manager) load() error {
-	b, err := os.ReadFile(m.path)
+	list, err := readServers(m.path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return err
-	}
-	var list []*Server
-	if err := json.Unmarshal(b, &list); err != nil {
-		return fmt.Errorf("parse %s: %w", m.path, err)
+		// The live file is corrupt/unreadable; try the .bak recovery copy
+		// rather than refusing to boot (which would orphan running containers).
+		bak, berr := readServers(m.path + ".bak")
+		if berr != nil {
+			return err // nothing to recover from; surface the original error
+		}
+		slog.Warn("servers.json unreadable; recovered from .bak", "err", err)
+		list = bak
 	}
 	for _, s := range list {
 		m.items[s.ID] = s
@@ -173,20 +207,26 @@ func (m *Manager) load() error {
 	return nil
 }
 
-// save writes atomically; caller holds m.mu.
+// save writes atomically; caller holds m.mu. It rotates the previous good file
+// to <path>.bak first so a corrupt/partial write stays recoverable.
 func (m *Manager) save() error {
 	list := make([]*Server, 0, len(m.items))
 	for _, s := range m.items {
 		list = append(list, s)
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].CreatedAt < list[j].CreatedAt })
-	b, err := json.MarshalIndent(list, "", "  ")
+	b, err := json.MarshalIndent(fileFormat{SchemaVersion: currentSchemaVersion, Servers: list}, "", "  ")
 	if err != nil {
 		return err
 	}
 	tmp := m.path + ".tmp"
 	if err := os.WriteFile(tmp, b, 0o644); err != nil {
 		return err
+	}
+	// Best-effort: keep the last good file as .bak (skipped on the first save,
+	// when no main file exists yet).
+	if prev, rerr := os.ReadFile(m.path); rerr == nil {
+		_ = os.WriteFile(m.path+".bak", prev, 0o644)
 	}
 	return os.Rename(tmp, m.path)
 }
