@@ -85,6 +85,19 @@ func TestHealthIsPublic(t *testing.T) {
 	}
 }
 
+func TestRemoteAccessRequiresPassword(t *testing.T) {
+	h, _, _ := newTestAPI(t)
+	// Enabling remote access without an operator password is rejected.
+	if rec := do(t, h, http.MethodPost, "/api/system/remote-access", `{"enabled":true}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("enable without password: want 400, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	// Status shows it disabled with no password set.
+	rec := do(t, h, http.MethodGet, "/api/system/remote-access", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"enabled":false`) || !strings.Contains(rec.Body.String(), `"hasPassword":false`) {
+		t.Fatalf("remote-access status: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestAuthStatusReportsState(t *testing.T) {
 	h, _, _ := newTestAPI(t)
 	// Non-loopback, no password: not authenticated, no password.

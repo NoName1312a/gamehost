@@ -11,6 +11,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/auth"
 	"github.com/leop1/gamehost/engine/internal/config"
 	"github.com/leop1/gamehost/engine/internal/docker"
+	"github.com/leop1/gamehost/engine/internal/remote"
 	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
@@ -58,8 +59,9 @@ func newTestAPI(t *testing.T) (http.Handler, *server.Manager, *auth.Store) {
 	if err != nil {
 		t.Fatalf("new auth: %v", err)
 	}
+	rc := remote.New(t.TempDir(), "127.0.0.1")
 	cfg := config.Config{AllowOrigins: []string{"http://localhost:5173"}}
-	return NewRouter(cfg, rt, reg, mgr, nil, nil, au), mgr, au
+	return NewRouter(cfg, rt, reg, mgr, nil, nil, au, rc), mgr, au
 }
 
 // TestWriteFileRejectsOversizedBody verifies the file-write endpoint caps the

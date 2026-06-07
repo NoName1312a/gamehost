@@ -16,6 +16,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/docker"
 	"github.com/leop1/gamehost/engine/internal/network"
 	"github.com/leop1/gamehost/engine/internal/relay"
+	"github.com/leop1/gamehost/engine/internal/remote"
 	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
@@ -29,14 +30,16 @@ type API struct {
 	rt    *docker.Runtime
 	reg   *templates.Registry
 	mgr   *server.Manager
-	net   *network.Mapper
-	relay *relay.Agent
-	auth  *auth.Store
+	net    *network.Mapper
+	relay  *relay.Agent
+	auth   *auth.Store
+	remote *remote.Controller
 }
 
-// NewRouter wires up the HTTP routes and middleware.
-func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager, net *network.Mapper, rel *relay.Agent, au *auth.Store) http.Handler {
-	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr, net: net, relay: rel, auth: au}
+// NewRouter wires up the HTTP routes and middleware. It also hands the assembled
+// handler to the remote controller so the remote listener serves the same API.
+func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, mgr *server.Manager, net *network.Mapper, rel *relay.Agent, au *auth.Store, rc *remote.Controller) http.Handler {
+	a := &API{cfg: cfg, rt: rt, reg: reg, mgr: mgr, net: net, relay: rel, auth: au, remote: rc}
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -66,6 +69,8 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 			r.Get("/system/setup", a.setupReport)
 			r.Post("/system/setup/{step}", a.runSetupStep)
 			r.Get("/system/network", a.networkStatus)
+			r.Get("/system/remote-access", a.remoteAccessStatus)
+			r.Post("/system/remote-access", a.setRemoteAccess)
 			r.Get("/system/relay", a.relayStatus)
 			r.Post("/system/relay/link", a.relayLink)
 			r.Post("/system/relay/{action}", a.relayAction)
@@ -97,6 +102,9 @@ func NewRouter(cfg config.Config, rt *docker.Runtime, reg *templates.Registry, m
 		})
 	})
 
+	if rc != nil {
+		rc.SetHandler(r)
+	}
 	return r
 }
 

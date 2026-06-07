@@ -20,6 +20,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/docker"
 	"github.com/leop1/gamehost/engine/internal/network"
 	"github.com/leop1/gamehost/engine/internal/relay"
+	"github.com/leop1/gamehost/engine/internal/remote"
 	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
@@ -53,10 +54,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	remoteCtrl := remote.New(cfg.DataDir, "0.0.0.0")
+
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.NewRouter(cfg, rt, reg, mgr, netMapper, relayAgent, authStore),
+		Handler:           api.NewRouter(cfg, rt, reg, mgr, netMapper, relayAgent, authStore, remoteCtrl),
 		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	// Re-open the remote-access HTTPS listener if it was left enabled.
+	if err := remoteCtrl.StartIfEnabled(); err != nil {
+		slog.Warn("remote access failed to start", "err", err)
 	}
 
 	// The relay agent is started on demand by the manager — only while a
@@ -105,6 +113,7 @@ func main() {
 	// Remove any UPnP port mappings so they don't linger on the router.
 	netMapper.UnmapAll(ctx)
 	relayAgent.Stop()
+	remoteCtrl.Shutdown(ctx)
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("graceful shutdown failed", "err", err)
 	}
