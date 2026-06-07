@@ -11,18 +11,52 @@ import (
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
 
-// fakeRuntime implements Runtime without touching Docker.
+// fakeRuntime implements Runtime without touching Docker. If running is non-nil
+// it tracks per-container state (Run/Start/Stop update it, Inspect reads it);
+// otherwise Inspect returns the static `state` (the simpler legacy behavior).
 type fakeRuntime struct {
 	state    docker.State
+	running  map[string]bool
 	lastSpec docker.CreateSpec // captured by Run for spec assertions
 }
 
-func (f *fakeRuntime) Run(_ context.Context, spec docker.CreateSpec) error          { f.lastSpec = spec; return nil }
-func (f *fakeRuntime) Start(context.Context, string) error                         { return nil }
-func (f *fakeRuntime) Stop(context.Context, string) error                          { return nil }
-func (f *fakeRuntime) Remove(context.Context, string) error                        { return nil }
-func (f *fakeRuntime) RemoveVolume(context.Context, string) error                  { return nil }
-func (f *fakeRuntime) Inspect(context.Context, string) docker.State                { return f.state }
+func (f *fakeRuntime) Run(_ context.Context, spec docker.CreateSpec) error {
+	f.lastSpec = spec
+	if f.running != nil {
+		f.running[spec.Name] = true
+	}
+	return nil
+}
+func (f *fakeRuntime) Start(_ context.Context, name string) error {
+	if f.running != nil {
+		f.running[name] = true
+	}
+	return nil
+}
+func (f *fakeRuntime) Stop(_ context.Context, name string) error {
+	if f.running != nil {
+		f.running[name] = false
+	}
+	return nil
+}
+func (f *fakeRuntime) Remove(_ context.Context, name string) error {
+	if f.running != nil {
+		delete(f.running, name)
+	}
+	return nil
+}
+func (f *fakeRuntime) RemoveVolume(context.Context, string) error { return nil }
+func (f *fakeRuntime) Inspect(_ context.Context, name string) docker.State {
+	if f.running != nil {
+		running, exists := f.running[name]
+		status := "exited"
+		if running {
+			status = "running"
+		}
+		return docker.State{Exists: exists, Running: running, Status: status}
+	}
+	return f.state
+}
 func (f *fakeRuntime) RestoreVolume(context.Context, string, string, string) error { return nil }
 func (f *fakeRuntime) CreateBackup(context.Context, string, string, string) error  { return nil }
 func (f *fakeRuntime) ImageExists(context.Context, string) bool                    { return true }
@@ -392,6 +426,56 @@ func TestLoadRecoversFromBak(t *testing.T) {
 	}
 	if _, ok := m2.Get(two.ID); ok {
 		t.Errorf("did not expect server %q (it was only in the corrupt main file)", two.ID)
+	}
+}
+
+func TestFreeTierCapsRunningServers(t *testing.T) {
+	reg := testRegistry(t)
+	rt := &fakeRuntime{running: map[string]bool{}}
+	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	if err != nil {
+		t.Fatalf("new manager: %v", err)
+	}
+	m.SetEntitlement(func() bool { return false }) // free tier
+
+	a, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "A", Port: 25565})
+	b, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "B", Port: 25566})
+	c, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "C", Port: 25567})
+
+	ctx := context.Background()
+	if err := m.Start(ctx, a.ID); err != nil {
+		t.Fatalf("start A: %v", err)
+	}
+	if err := m.Start(ctx, b.ID); err != nil {
+		t.Fatalf("start B: %v", err)
+	}
+	if err := m.Start(ctx, c.ID); err == nil || !strings.Contains(err.Error(), "free plan") {
+		t.Fatalf("3rd start on free tier should be blocked, got %v", err)
+	}
+
+	// Upgrading to Pro lifts the cap.
+	m.SetEntitlement(func() bool { return true })
+	if err := m.Start(ctx, c.ID); err != nil {
+		t.Errorf("Pro should allow the 3rd server: %v", err)
+	}
+}
+
+func TestFreeTierCannotSchedule(t *testing.T) {
+	m, _ := newTestManager(t)
+	m.SetEntitlement(func() bool { return false })
+	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "S", Port: 25565})
+
+	if err := m.SetSchedule(s.ID, "03:00", ""); err == nil || !strings.Contains(err.Error(), "Pro") {
+		t.Fatalf("free tier should not set a schedule, got %v", err)
+	}
+	// Clearing a schedule is always allowed.
+	if err := m.SetSchedule(s.ID, "", ""); err != nil {
+		t.Errorf("clearing a schedule should be allowed on free: %v", err)
+	}
+	// Pro can schedule.
+	m.SetEntitlement(func() bool { return true })
+	if err := m.SetSchedule(s.ID, "03:00", "02:00"); err != nil {
+		t.Errorf("Pro should be able to schedule: %v", err)
 	}
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type RemoteAccess } from "../lib/api";
+import { api, type LicenseInfo, type RemoteAccess } from "../lib/api";
 import { appVersion, applyUpdate, checkForUpdate, isDesktop, type UpdateInfo } from "../lib/updater";
 
 export function Settings({
@@ -22,10 +22,41 @@ export function Settings({
   const [raBusy, setRaBusy] = useState(false);
   const [raError, setRaError] = useState<string | null>(null);
 
+  const [license, setLicense] = useState<LicenseInfo | null>(null);
+  const [licKey, setLicKey] = useState("");
+  const [licBusy, setLicBusy] = useState(false);
+  const [licError, setLicError] = useState<string | null>(null);
+
   useEffect(() => {
     appVersion().then(setAppVer).catch(() => setAppVer(null));
     api.remoteAccess().then(setRemote).catch(() => setRemote(null));
+    api.license().then(setLicense).catch(() => setLicense(null));
   }, []);
+
+  async function activateLicense() {
+    setLicBusy(true);
+    setLicError(null);
+    try {
+      setLicense(await api.setLicense(licKey.trim()));
+      setLicKey("");
+    } catch (e) {
+      setLicError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLicBusy(false);
+    }
+  }
+
+  async function removeLicense() {
+    setLicBusy(true);
+    setLicError(null);
+    try {
+      setLicense(await api.clearLicense());
+    } catch (e) {
+      setLicError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLicBusy(false);
+    }
+  }
 
   async function savePassword() {
     if (newPw.length < 8) {
@@ -192,6 +223,58 @@ export function Settings({
             </div>
           )}
           {raError && <p className="mt-2 text-xs text-rose-400">{raError}</p>}
+        </div>
+
+        <div className="mt-5 border-t border-zinc-800 pt-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-200">Plan</h3>
+            {license && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${
+                  license.pro
+                    ? "text-emerald-300 bg-emerald-400/10 ring-emerald-400/20"
+                    : "text-zinc-400 bg-zinc-400/10 ring-zinc-400/20"
+                }`}
+              >
+                {license.pro ? "Pro" : "Free"}
+              </span>
+            )}
+          </div>
+          {license?.pro ? (
+            <div className="mt-2 space-y-2">
+              <p className="text-xs text-zinc-500">
+                Pro is active{license.email ? ` — ${license.email}` : ""}. Thanks for supporting GameHost!
+              </p>
+              <button
+                onClick={removeLicense}
+                disabled={licBusy}
+                className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+              >
+                {licBusy ? "…" : "Remove license"}
+              </button>
+            </div>
+          ) : (
+            <div className="mt-2 space-y-2">
+              <p className="text-xs text-zinc-500">
+                Free runs up to 2 servers at once. Pro unlocks unlimited servers, scheduled backups &amp; restarts, and
+                off-site backups.
+              </p>
+              <input
+                value={licKey}
+                onChange={(e) => setLicKey(e.target.value)}
+                placeholder="Paste your license key"
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100 outline-none focus:border-emerald-500"
+              />
+              <button
+                onClick={activateLicense}
+                disabled={licBusy || !licKey.trim()}
+                className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
+              >
+                {licBusy ? "Activating…" : "Activate Pro"}
+              </button>
+            </div>
+          )}
+          {licError && <p className="mt-2 text-xs text-rose-400">{licError}</p>}
         </div>
       </div>
     </div>

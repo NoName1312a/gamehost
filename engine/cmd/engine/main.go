@@ -64,6 +64,7 @@ func main() {
 	}
 
 	licenseStore := license.NewStore(cfg.DataDir, license.EmbeddedPublicKey())
+	mgr.SetEntitlement(licenseStore.IsPro) // gate Pro-only features (server cap, schedules)
 
 	srv := &http.Server{
 		Addr: cfg.Addr,

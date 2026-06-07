@@ -171,6 +171,12 @@ export interface RemoteAccess {
   externalIP?: string;
 }
 
+export interface LicenseInfo {
+  tier: string;
+  email?: string;
+  pro: boolean;
+}
+
 export interface Stats {
   cpuPercent: number;
   memUsedMB: number;
@@ -233,6 +239,9 @@ export const api = {
   remoteAccess: () => get<RemoteAccess>("/api/system/remote-access"),
   setRemoteAccess: (enabled: boolean, port?: number) =>
     send<RemoteAccess>("POST", "/api/system/remote-access", { enabled, port }),
+  license: () => get<LicenseInfo>("/api/license"),
+  setLicense: (key: string) => send<LicenseInfo>("POST", "/api/license", { key }),
+  clearLicense: () => send<LicenseInfo>("DELETE", "/api/license"),
   runtime: () => get<Runtime>("/api/system/runtime"),
   setup: () => get<Setup>("/api/system/setup"),
   // endpoint is the absolute API path from a SetupStep's action (e.g. /api/system/setup/start-docker).
