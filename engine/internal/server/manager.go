@@ -33,7 +33,9 @@ type Server struct {
 	Env           map[string]string    `json:"env"`
 	Ports         []docker.PortMapping `json:"ports"`
 	MemoryMB      int                  `json:"memoryMB"`
-	DataPath      string               `json:"dataPath"`
+	// CPUs caps CPU cores for this server (e.g. 1.5). 0 leaves CPU uncapped.
+	CPUs          float64 `json:"cpus,omitempty"`
+	DataPath      string  `json:"dataPath"`
 	CommandMethod string               `json:"commandMethod"`
 	CreatedAt     string               `json:"createdAt"`
 	// RelayAddress is the public playit.gg address the user pasted back from
@@ -72,6 +74,7 @@ type CreateRequest struct {
 	TemplateID string            `json:"templateId"`
 	Name       string            `json:"name"`
 	MemoryMB   int               `json:"memoryMB"`
+	CPUs       float64           `json:"cpus"` // CPU-core cap; 0 = uncapped
 	Port       int               `json:"port"` // primary host port
 	Variables  map[string]string `json:"variables"`
 }
@@ -262,6 +265,10 @@ func (m *Manager) Create(req CreateRequest) (*Server, error) {
 	if dataPath == "" {
 		dataPath = "/data"
 	}
+	cpus := req.CPUs
+	if cpus < 0 {
+		cpus = 0
+	}
 
 	s := &Server{
 		ID:            genID(),
@@ -272,6 +279,7 @@ func (m *Manager) Create(req CreateRequest) (*Server, error) {
 		Env:           env,
 		Ports:         ports,
 		MemoryMB:      mem,
+		CPUs:          cpus,
 		DataPath:      dataPath,
 		CommandMethod: t.CommandMethod,
 		CreatedAt:     time.Now().UTC().Format(time.RFC3339),
@@ -319,6 +327,7 @@ func (m *Manager) portOwnerExcept(ports []docker.PortMapping, exceptID string) s
 type UpdateRequest struct {
 	Name      string            `json:"name"`
 	MemoryMB  int               `json:"memoryMB"`
+	CPUs      float64           `json:"cpus"` // CPU-core cap; 0 = keep current
 	Port      int               `json:"port"` // primary host port
 	Variables map[string]string `json:"variables"`
 }
@@ -406,6 +415,9 @@ func (m *Manager) Update(ctx context.Context, id string, req UpdateRequest) (*Se
 	s.Env = env
 	s.Ports = ports
 	s.MemoryMB = mem
+	if req.CPUs > 0 {
+		s.CPUs = req.CPUs
+	}
 	if err := m.save(); err != nil {
 		m.mu.Unlock()
 		return nil, err
@@ -427,6 +439,7 @@ func (m *Manager) specFor(s *Server) docker.CreateSpec {
 		Env:       s.Env,
 		Ports:     s.Ports,
 		MemoryMB:  s.MemoryMB,
+		CPUs:      s.CPUs,
 		Volume:    s.VolumeName(),
 		DataPath:  s.DataPath,
 		OpenStdin: true,

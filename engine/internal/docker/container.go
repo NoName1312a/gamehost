@@ -6,7 +6,17 @@ import (
 	"io"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
+)
+
+const (
+	// defaultPidsLimit caps processes/threads per container as a fork-bomb guard.
+	// Generous enough for heavy Java servers (many JVM threads) while still well
+	// below the host's pid_max, so a runaway container can't exhaust host PIDs.
+	defaultPidsLimit = 4096
+	// defaultNofile bounds per-container file descriptors.
+	defaultNofile = 1048576
 )
 
 // PortMapping maps a host port to a container port.
@@ -18,11 +28,16 @@ type PortMapping struct {
 
 // CreateSpec is everything needed to launch a game-server container.
 type CreateSpec struct {
-	Name      string
-	Image     string
-	Env       map[string]string
-	Ports     []PortMapping
-	MemoryMB  int
+	Name     string
+	Image    string
+	Env      map[string]string
+	Ports    []PortMapping
+	MemoryMB int
+	// CPUs caps CPU cores (e.g. 1.5). 0 leaves CPU uncapped.
+	CPUs float64
+	// PidsLimit caps the number of processes/threads (fork-bomb guard). 0 applies
+	// the default (defaultPidsLimit); a negative value disables the cap.
+	PidsLimit int
 	Volume    string // named volume for persistent data
 	DataPath  string // mount point inside the container
 	OpenStdin bool
@@ -61,6 +76,18 @@ func RunArgs(spec CreateSpec) []string {
 	if spec.MemoryMB > 0 {
 		args = append(args, "-m", fmt.Sprintf("%dm", spec.MemoryMB))
 	}
+	if spec.CPUs > 0 {
+		args = append(args, "--cpus", strconv.FormatFloat(spec.CPUs, 'f', -1, 64))
+	}
+	// Fork-bomb guard: 0 applies the default cap; a negative value opts out.
+	if pids := spec.PidsLimit; pids >= 0 {
+		if pids == 0 {
+			pids = defaultPidsLimit
+		}
+		args = append(args, "--pids-limit", strconv.Itoa(pids))
+	}
+	// Bound per-container file descriptors so one server can't exhaust the host's.
+	args = append(args, "--ulimit", fmt.Sprintf("nofile=%d:%d", defaultNofile, defaultNofile))
 	for _, k := range sortedKeys(spec.Env) {
 		args = append(args, "-e", k+"="+spec.Env[k])
 	}

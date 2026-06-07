@@ -135,6 +135,7 @@ export interface ServerSummary {
   env: Record<string, string>;
   ports: PortMapping[];
   memoryMB: number;
+  cpus?: number; // CPU-core cap; 0/absent = uncapped
   dataPath: string;
   commandMethod: string;
   createdAt: string;
@@ -167,6 +168,7 @@ export interface CreateServerRequest {
   templateId: string;
   name: string;
   memoryMB: number;
+  cpus?: number; // CPU-core cap; 0/omitted = uncapped
   port: number;
   variables: Record<string, string>;
 }
@@ -174,6 +176,7 @@ export interface CreateServerRequest {
 export interface UpdateServerRequest {
   name: string;
   memoryMB: number;
+  cpus?: number; // CPU-core cap; 0/omitted = keep current
   port: number;
   variables: Record<string, string>;
 }

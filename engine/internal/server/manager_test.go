@@ -13,10 +13,11 @@ import (
 
 // fakeRuntime implements Runtime without touching Docker.
 type fakeRuntime struct {
-	state docker.State
+	state    docker.State
+	lastSpec docker.CreateSpec // captured by Run for spec assertions
 }
 
-func (f *fakeRuntime) Run(context.Context, docker.CreateSpec) error                { return nil }
+func (f *fakeRuntime) Run(_ context.Context, spec docker.CreateSpec) error          { f.lastSpec = spec; return nil }
 func (f *fakeRuntime) Start(context.Context, string) error                         { return nil }
 func (f *fakeRuntime) Stop(context.Context, string) error                          { return nil }
 func (f *fakeRuntime) Remove(context.Context, string) error                        { return nil }
@@ -101,6 +102,36 @@ func TestCreateMergesEnvAndDefaults(t *testing.T) {
 	}
 	if len(s.Ports) != 1 || s.Ports[0].Host != 25565 || s.Ports[0].Container != 25565 {
 		t.Errorf("ports wrong: %+v", s.Ports)
+	}
+}
+
+func TestCreateAppliesCPUsToSpec(t *testing.T) {
+	tdir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tdir, "test-mc.yaml"), []byte(testTemplate), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reg := templates.NewRegistry(tdir)
+	if err := reg.Load(); err != nil {
+		t.Fatalf("load templates: %v", err)
+	}
+	rt := &fakeRuntime{} // zero state => container "not created" => Start calls Run
+	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	if err != nil {
+		t.Fatalf("new manager: %v", err)
+	}
+
+	s, err := m.Create(CreateRequest{TemplateID: "test-mc", Name: "Capped", Port: 25565, CPUs: 2})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if s.CPUs != 2 {
+		t.Errorf("CPUs not persisted on record: got %v want 2", s.CPUs)
+	}
+	if err := m.Start(context.Background(), s.ID); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if rt.lastSpec.CPUs != 2 {
+		t.Errorf("CPUs not carried into container spec: got %v want 2", rt.lastSpec.CPUs)
 	}
 }
 

@@ -53,6 +53,7 @@ function OptionsForm({
   const [name, setName] = useState(template.name);
   const [port, setPort] = useState<number>(template.ports?.[0]?.default ?? 0);
   const [memory, setMemory] = useState<number>(template.recMemoryMB);
+  const [cpus, setCpus] = useState<number>(0); // 0 = no CPU limit
   const [vars, setVars] = useState<Record<string, string>>(() => {
     const v: Record<string, string> = {};
     for (const variable of template.variables ?? []) v[variable.key] = variable.default ?? "";
@@ -70,6 +71,7 @@ function OptionsForm({
         templateId: template.id,
         name: name.trim() || template.name,
         memoryMB: memory,
+        cpus: cpus > 0 ? cpus : undefined,
         port,
         variables: vars,
       };
@@ -107,6 +109,18 @@ function OptionsForm({
             min={template.minMemoryMB}
           />
         </div>
+      </div>
+      <div>
+        <label className={labelCls}>CPU limit (cores)</label>
+        <input
+          className={field}
+          type="number"
+          value={cpus}
+          onChange={(e) => setCpus(Number(e.target.value))}
+          min={0}
+          step={0.5}
+        />
+        <p className="mt-1 text-xs text-zinc-600">0 = no limit. Cap cores so one server can't starve the others.</p>
       </div>
       {(template.variables ?? []).map((v) => (
         <div key={v.key}>
