@@ -157,6 +157,20 @@ export interface BackupInfo {
   size: number;
 }
 
+export interface AuthStatus {
+  authenticated: boolean;
+  hasPassword: boolean;
+  loopback: boolean;
+}
+
+export interface RemoteAccess {
+  enabled: boolean;
+  port: number;
+  addr?: string;
+  hasPassword: boolean;
+  externalIP?: string;
+}
+
 export interface Stats {
   cpuPercent: number;
   memUsedMB: number;
@@ -211,6 +225,14 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
 export const api = {
   base: ENGINE_BASE,
   health: () => get<Health>("/api/health"),
+  authStatus: () => get<AuthStatus>("/api/auth/status"),
+  login: (password: string) => send<{ status: string; token: string }>("POST", "/api/auth/login", { password }),
+  logout: () => send<{ status: string }>("POST", "/api/auth/logout"),
+  setPassword: (newPassword: string, currentPassword?: string) =>
+    send<{ status: string }>("POST", "/api/auth/password", { newPassword, currentPassword }),
+  remoteAccess: () => get<RemoteAccess>("/api/system/remote-access"),
+  setRemoteAccess: (enabled: boolean, port?: number) =>
+    send<RemoteAccess>("POST", "/api/system/remote-access", { enabled, port }),
   runtime: () => get<Runtime>("/api/system/runtime"),
   setup: () => get<Setup>("/api/system/setup"),
   // endpoint is the absolute API path from a SetupStep's action (e.g. /api/system/setup/start-docker).

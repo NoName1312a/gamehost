@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { api, type RemoteAccess } from "../lib/api";
 import { appVersion, applyUpdate, checkForUpdate, isDesktop, type UpdateInfo } from "../lib/updater";
 
 export function Settings({
@@ -16,9 +17,53 @@ export function Settings({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
+  const [remote, setRemote] = useState<RemoteAccess | null>(null);
+  const [newPw, setNewPw] = useState("");
+  const [raBusy, setRaBusy] = useState(false);
+  const [raError, setRaError] = useState<string | null>(null);
+
   useEffect(() => {
     appVersion().then(setAppVer).catch(() => setAppVer(null));
+    api.remoteAccess().then(setRemote).catch(() => setRemote(null));
   }, []);
+
+  async function savePassword() {
+    if (newPw.length < 8) {
+      setRaError("Password must be at least 8 characters.");
+      return;
+    }
+    setRaBusy(true);
+    setRaError(null);
+    try {
+      await api.setPassword(newPw);
+      setNewPw("");
+      setRemote(await api.remoteAccess());
+    } catch (e) {
+      setRaError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRaBusy(false);
+    }
+  }
+
+  async function toggleRemote() {
+    if (!remote) return;
+    setRaBusy(true);
+    setRaError(null);
+    try {
+      setRemote(await api.setRemoteAccess(!remote.enabled));
+    } catch (e) {
+      setRaError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRaBusy(false);
+    }
+  }
+
+  // Best public address to reach the panel remotely (LAN IP fallback handled by the engine).
+  const remoteURL = remote?.addr
+    ? `https://${remote.externalIP || remote.addr.replace(/^0\.0\.0\.0/, "")}`
+    : remote?.externalIP
+      ? `https://${remote.externalIP}:${remote.port}`
+      : `https://<your-ip>:${remote?.port ?? 8788}`;
 
   async function check() {
     setChecking(true);
@@ -96,6 +141,57 @@ export function Settings({
           ) : (
             <p className="mt-2 text-xs text-zinc-500">Updates are managed by the desktop app.</p>
           )}
+        </div>
+
+        <div className="mt-5 border-t border-zinc-800 pt-4">
+          <h3 className="text-sm font-semibold text-zinc-200">Remote access</h3>
+          <p className="mt-1 text-xs text-zinc-500">
+            Manage your servers from another device over HTTPS on your network. Set a password first.
+          </p>
+          {remote === null ? (
+            <p className="mt-2 text-xs text-zinc-500">…</p>
+          ) : !remote.hasPassword ? (
+            <div className="mt-3 space-y-2">
+              <input
+                type="password"
+                value={newPw}
+                onChange={(e) => setNewPw(e.target.value)}
+                placeholder="Set a password (min 8 characters)"
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-emerald-500"
+              />
+              <button
+                onClick={savePassword}
+                disabled={raBusy}
+                className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
+              >
+                {raBusy ? "Saving…" : "Set password"}
+              </button>
+            </div>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <button
+                onClick={toggleRemote}
+                disabled={raBusy}
+                className={`w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
+                  remote.enabled
+                    ? "border border-zinc-700 text-zinc-200 hover:bg-zinc-800"
+                    : "bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+                }`}
+              >
+                {raBusy ? "…" : remote.enabled ? "Turn off remote access" : "Turn on remote access"}
+              </button>
+              {remote.enabled && (
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs">
+                  <p className="text-zinc-400">Reach the panel at:</p>
+                  <p className="mt-1 break-all font-mono text-emerald-300">{remoteURL}</p>
+                  <p className="mt-2 text-zinc-500">
+                    Uses a self-signed certificate — your browser warns once; choose “proceed”/trust it.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          {raError && <p className="mt-2 text-xs text-rose-400">{raError}</p>}
         </div>
       </div>
     </div>

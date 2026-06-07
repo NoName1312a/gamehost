@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   api,
   type Health,
@@ -306,6 +306,19 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
 
+  // Auth gate: loopback (desktop) is always authenticated, so this only ever
+  // shows a login for remote browsers. null = unknown (don't gate yet).
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  const refreshAuth = useCallback(() => {
+    api
+      .authStatus()
+      .then((s) => setAuthed(s.authenticated))
+      .catch(() => setAuthed(true)); // status unreachable -> let normal offline handling take over
+  }, []);
+  useEffect(() => {
+    refreshAuth();
+  }, [refreshAuth]);
+
   // Check for a newer desktop-app version once on launch (no-op in a browser).
   useEffect(() => {
     checkForUpdate()
@@ -332,6 +345,17 @@ export default function App() {
 
   if (health.status === "error") {
     return <EngineOffline error={health.error} onRetry={retry} />;
+  }
+
+  if (authed === false) {
+    return (
+      <Login
+        onLoggedIn={() => {
+          setAuthed(true);
+          retry();
+        }}
+      />
+    );
   }
 
   const version = health.status === "ok" ? health.data.version : undefined;
@@ -461,6 +485,54 @@ export default function App() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.login(pw);
+      onLoggedIn();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="grid min-h-screen place-items-center p-6">
+      <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-lg font-black text-zinc-950">
+            G
+          </div>
+          <h1 className="text-base font-semibold text-zinc-100">Sign in to GameHost</h1>
+        </div>
+        <label className="mb-1 block text-xs font-medium text-zinc-400">Password</label>
+        <input
+          type="password"
+          value={pw}
+          autoFocus
+          onChange={(e) => setPw(e.target.value)}
+          className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-emerald-500"
+        />
+        {err && <p className="mt-2 text-xs text-rose-400">{err}</p>}
+        <button
+          type="submit"
+          disabled={busy}
+          className="mt-4 w-full rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
+        >
+          {busy ? "Signing in…" : "Sign in"}
+        </button>
+      </form>
     </div>
   );
 }
