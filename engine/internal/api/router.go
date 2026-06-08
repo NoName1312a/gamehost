@@ -101,6 +101,8 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/system/network", a.networkStatus)
 			r.Get("/system/remote-access", a.remoteAccessStatus)
 			r.Post("/system/remote-access", a.setRemoteAccess)
+			r.Get("/system/offsite", a.offsiteStatus)
+			r.Post("/system/offsite", a.setOffsite)
 			r.Get("/system/relay", a.relayStatus)
 			r.Post("/system/relay/link", a.relayLink)
 			r.Post("/system/relay/{action}", a.relayAction)

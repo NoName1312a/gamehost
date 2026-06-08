@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,9 +16,10 @@ import (
 // it tracks per-container state (Run/Start/Stop update it, Inspect reads it);
 // otherwise Inspect returns the static `state` (the simpler legacy behavior).
 type fakeRuntime struct {
-	state    docker.State
-	running  map[string]bool
-	lastSpec docker.CreateSpec // captured by Run for spec assertions
+	state      docker.State
+	running    map[string]bool
+	lastSpec   docker.CreateSpec // captured by Run for spec assertions
+	exportData []byte            // bytes ExportBackup streams out
 }
 
 func (f *fakeRuntime) Run(_ context.Context, spec docker.CreateSpec) error {
@@ -59,6 +61,10 @@ func (f *fakeRuntime) Inspect(_ context.Context, name string) docker.State {
 }
 func (f *fakeRuntime) RestoreVolume(context.Context, string, string, string) error { return nil }
 func (f *fakeRuntime) CreateBackup(context.Context, string, string, string) error  { return nil }
+func (f *fakeRuntime) ExportBackup(_ context.Context, _, _ string, w io.Writer) error {
+	_, err := w.Write(f.exportData)
+	return err
+}
 func (f *fakeRuntime) ImageExists(context.Context, string) bool                    { return true }
 func (f *fakeRuntime) Pull(context.Context, string, func(int, string)) error       { return nil }
 
@@ -476,6 +482,46 @@ func TestFreeTierCannotSchedule(t *testing.T) {
 	m.SetEntitlement(func() bool { return true })
 	if err := m.SetSchedule(s.ID, "03:00", "02:00"); err != nil {
 		t.Errorf("Pro should be able to schedule: %v", err)
+	}
+}
+
+func TestBackupCopiesOffsiteOnlyWhenProAndConfigured(t *testing.T) {
+	reg := testRegistry(t)
+	rt := &fakeRuntime{exportData: []byte("ARCHIVE-BYTES")}
+	dataDir := t.TempDir()
+	m, err := NewManager(dataDir, rt, nil, nil, reg)
+	if err != nil {
+		t.Fatalf("new manager: %v", err)
+	}
+	dest := t.TempDir()
+	if err := m.SetOffsiteDir(dest); err != nil {
+		t.Fatalf("set offsite dir: %v", err)
+	}
+	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "S", Port: 25565})
+	ctx := context.Background()
+
+	// Free tier: a backup is created but NOT copied off-site.
+	m.SetEntitlement(func() bool { return false })
+	file, err := m.Backup(ctx, s.ID)
+	if err != nil {
+		t.Fatalf("free backup: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, file)); err == nil {
+		t.Error("free tier must not copy backups off-site")
+	}
+
+	// Pro tier: the archive is copied to the off-site folder.
+	m.SetEntitlement(func() bool { return true })
+	file, err = m.Backup(ctx, s.ID)
+	if err != nil {
+		t.Fatalf("pro backup: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(dest, file))
+	if err != nil {
+		t.Fatalf("off-site copy missing: %v", err)
+	}
+	if string(got) != "ARCHIVE-BYTES" {
+		t.Errorf("off-site copy content = %q, want ARCHIVE-BYTES", got)
 	}
 }
 

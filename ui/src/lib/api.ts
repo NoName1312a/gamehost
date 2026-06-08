@@ -177,6 +177,11 @@ export interface LicenseInfo {
   pro: boolean;
 }
 
+export interface Offsite {
+  dir: string;
+  pro: boolean;
+}
+
 export interface Stats {
   cpuPercent: number;
   memUsedMB: number;
@@ -242,6 +247,8 @@ export const api = {
   license: () => get<LicenseInfo>("/api/license"),
   setLicense: (key: string) => send<LicenseInfo>("POST", "/api/license", { key }),
   clearLicense: () => send<LicenseInfo>("DELETE", "/api/license"),
+  offsite: () => get<Offsite>("/api/system/offsite"),
+  setOffsite: (dir: string) => send<Offsite>("POST", "/api/system/offsite", { dir }),
   runtime: () => get<Runtime>("/api/system/runtime"),
   setup: () => get<Setup>("/api/system/setup"),
   // endpoint is the absolute API path from a SetupStep's action (e.g. /api/system/setup/start-docker).

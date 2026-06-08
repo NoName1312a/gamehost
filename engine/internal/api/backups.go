@@ -32,16 +32,15 @@ func (a *API) listBackups(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) createBackup(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	s, ok := a.mgr.Get(id)
-	if !ok {
+	if _, ok := a.mgr.Get(id); !ok {
 		writeJSON(w, http.StatusNotFound, errMsg("server not found"))
 		return
 	}
-	file := time.Now().UTC().Format("2006-01-02_15-04-05") + ".tar.gz"
-	// Generous: archiving a large world can take a while.
+	// Generous: archiving a large world (and any off-site copy) can take a while.
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
 	defer cancel()
-	if err := a.rt.CreateBackup(ctx, s.VolumeName(), id, file); err != nil {
+	file, err := a.mgr.Backup(ctx, id)
+	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errMsg(err.Error()))
 		return
 	}

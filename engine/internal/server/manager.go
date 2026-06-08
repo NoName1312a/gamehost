@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"github.com/leop1/gamehost/engine/internal/docker"
+	"github.com/leop1/gamehost/engine/internal/offsite"
 	"github.com/leop1/gamehost/engine/internal/safe"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
@@ -92,6 +94,7 @@ type Runtime interface {
 	Inspect(ctx context.Context, name string) docker.State
 	RestoreVolume(ctx context.Context, serverVol, id, file string) error
 	CreateBackup(ctx context.Context, serverVol, id, file string) error
+	ExportBackup(ctx context.Context, id, file string, w io.Writer) error
 	ImageExists(ctx context.Context, image string) bool
 	Pull(ctx context.Context, image string, onProgress func(percent int, status string)) error
 }
@@ -121,8 +124,9 @@ type Manager struct {
 	rt    Runtime
 	net   Networking // optional; nil disables auto port-forwarding
 	relay Relay      // optional; nil disables relay lifecycle management
-	reg   *templates.Registry
-	items map[string]*Server
+	reg     *templates.Registry
+	offsite *offsite.Store
+	items   map[string]*Server
 
 	// isPro reports whether the Pro tier is active; nil means unlimited (no
 	// gating), so the engine is fully functional until a license check is wired.
@@ -183,13 +187,14 @@ func NewManager(dataDir string, rt Runtime, net Networking, rel Relay, reg *temp
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
 	m := &Manager{
-		path:  filepath.Join(dataDir, "servers.json"),
-		rt:    rt,
-		net:   net,
-		relay: rel,
-		reg:   reg,
-		items: map[string]*Server{},
-		pulls: map[string]pullState{},
+		path:    filepath.Join(dataDir, "servers.json"),
+		rt:      rt,
+		net:     net,
+		relay:   rel,
+		reg:     reg,
+		offsite: offsite.New(dataDir),
+		items:   map[string]*Server{},
+		pulls:   map[string]pullState{},
 	}
 	if err := m.load(); err != nil {
 		return nil, err
@@ -832,13 +837,64 @@ func (m *Manager) scheduledBackup(id string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
+	if _, err := m.Backup(ctx, id); err != nil {
+		slog.Warn("scheduled backup failed", "server", id, "err", err)
+	}
+}
+
+// Backup archives a server's data volume and, on Pro with an off-site folder
+// configured, copies the archive there too. Returns the backup filename.
+func (m *Manager) Backup(ctx context.Context, id string) (string, error) {
 	s, ok := m.Get(id)
 	if !ok {
-		return
+		return "", fmt.Errorf("server not found")
 	}
 	file := time.Now().UTC().Format("2006-01-02_15-04-05") + ".tar.gz"
-	slog.Info("scheduled backup", "server", s.Name, "file", file)
+	slog.Info("backup", "server", s.Name, "file", file)
 	if err := m.rt.CreateBackup(ctx, s.VolumeName(), id, file); err != nil {
-		slog.Warn("scheduled backup failed", "server", s.Name, "err", err)
+		return "", err
 	}
+	m.copyOffsite(ctx, id, file) // best-effort; Pro + configured only
+	return file, nil
+}
+
+// copyOffsite streams the just-created archive to the configured off-site
+// folder. Best-effort: a failure is logged but never fails the backup.
+func (m *Manager) copyOffsite(ctx context.Context, id, file string) {
+	if m.offsite == nil || !m.proEnabled() {
+		return
+	}
+	dir := m.offsite.Dir()
+	if dir == "" {
+		return
+	}
+	dest := filepath.Join(dir, file)
+	f, err := os.Create(dest)
+	if err != nil {
+		slog.Warn("off-site backup: could not create destination", "dir", dir, "err", err)
+		return
+	}
+	defer f.Close()
+	if err := m.rt.ExportBackup(ctx, id, file, f); err != nil {
+		slog.Warn("off-site backup: copy failed", "err", err)
+		_ = os.Remove(dest)
+		return
+	}
+	slog.Info("off-site backup written", "dest", dest)
+}
+
+// OffsiteDir returns the configured off-site backup folder ("" if none).
+func (m *Manager) OffsiteDir() string {
+	if m.offsite == nil {
+		return ""
+	}
+	return m.offsite.Dir()
+}
+
+// SetOffsiteDir sets (and validates) the off-site backup folder.
+func (m *Manager) SetOffsiteDir(dir string) error {
+	if m.offsite == nil {
+		return fmt.Errorf("off-site backups are unavailable")
+	}
+	return m.offsite.SetDir(dir)
 }

@@ -2,6 +2,9 @@ package docker
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -75,6 +78,25 @@ func (r *Runtime) RestoreVolume(ctx context.Context, serverVol, id, file string)
 	}
 	_, err := r.run(ctx, args...)
 	return err
+}
+
+// ExportBackup streams a stored backup archive to w, so the engine can copy it
+// to an off-site folder on the host without Docker file-sharing.
+func (r *Runtime) ExportBackup(ctx context.Context, id, file string, w io.Writer) error {
+	cmd := exec.CommandContext(ctx, "docker", "run", "--rm",
+		"-v", backupsVolume+":/backups:ro", fileHelperImage,
+		"cat", "/backups/"+id+"/"+file)
+	cmd.Stdout = w
+	var errb strings.Builder
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(errb.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return fmt.Errorf("export backup: %s", msg)
+	}
+	return nil
 }
 
 // DeleteBackup removes one backup archive.

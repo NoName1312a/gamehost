@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type LicenseInfo, type RemoteAccess } from "../lib/api";
+import { api, type LicenseInfo, type Offsite, type RemoteAccess } from "../lib/api";
 import { appVersion, applyUpdate, checkForUpdate, isDesktop, type UpdateInfo } from "../lib/updater";
 
 export function Settings({
@@ -27,11 +27,40 @@ export function Settings({
   const [licBusy, setLicBusy] = useState(false);
   const [licError, setLicError] = useState<string | null>(null);
 
+  const [offsite, setOffsite] = useState<Offsite | null>(null);
+  const [offsiteDir, setOffsiteDir] = useState("");
+  const [offBusy, setOffBusy] = useState(false);
+  const [offError, setOffError] = useState<string | null>(null);
+  const [offSaved, setOffSaved] = useState(false);
+
   useEffect(() => {
     appVersion().then(setAppVer).catch(() => setAppVer(null));
     api.remoteAccess().then(setRemote).catch(() => setRemote(null));
     api.license().then(setLicense).catch(() => setLicense(null));
+    api
+      .offsite()
+      .then((o) => {
+        setOffsite(o);
+        setOffsiteDir(o.dir);
+      })
+      .catch(() => setOffsite(null));
   }, []);
+
+  async function saveOffsite() {
+    setOffBusy(true);
+    setOffError(null);
+    setOffSaved(false);
+    try {
+      const o = await api.setOffsite(offsiteDir.trim());
+      setOffsite(o);
+      setOffsiteDir(o.dir);
+      setOffSaved(true);
+    } catch (e) {
+      setOffError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setOffBusy(false);
+    }
+  }
 
   async function activateLicense() {
     setLicBusy(true);
@@ -275,6 +304,41 @@ export function Settings({
             </div>
           )}
           {licError && <p className="mt-2 text-xs text-rose-400">{licError}</p>}
+        </div>
+
+        <div className="mt-5 border-t border-zinc-800 pt-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-200">Off-site backups</h3>
+            {offsite && !offsite.pro && (
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-medium text-amber-300 bg-amber-400/10 ring-1 ring-inset ring-amber-400/20">
+                Pro
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-zinc-500">
+            Also copy each backup to a folder — a NAS, external drive, or a synced cloud folder (OneDrive/Dropbox).
+            {offsite && !offsite.pro ? " Requires Pro to run." : ""}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={offsiteDir}
+              onChange={(e) => {
+                setOffsiteDir(e.target.value);
+                setOffSaved(false);
+              }}
+              placeholder="e.g. D:\Backups or \\nas\games"
+              className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100 outline-none focus:border-emerald-500"
+            />
+            <button
+              onClick={saveOffsite}
+              disabled={offBusy}
+              className="shrink-0 rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {offBusy ? "…" : "Save"}
+            </button>
+          </div>
+          {offSaved && <p className="mt-2 text-xs text-emerald-400">Saved.</p>}
+          {offError && <p className="mt-2 text-xs text-rose-400">{offError}</p>}
         </div>
       </div>
     </div>
