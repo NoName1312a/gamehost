@@ -107,6 +107,38 @@ func TestLoginThrottledAfterRepeatedFailures(t *testing.T) {
 	}
 }
 
+func TestUserManagementIsOwnerOnly(t *testing.T) {
+	h, _, au := newTestAPI(t)
+	if err := au.SetPassword("ownerpass1"); err != nil {
+		t.Fatalf("set owner: %v", err)
+	}
+	// Loopback (owner) can add an operator.
+	if rec := do(t, h, http.MethodPost, "/api/users", `{"username":"alice","password":"alicepw12","role":"operator"}`); rec.Code != http.StatusCreated {
+		t.Fatalf("owner add user: want 201, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	// Alice logs in remotely.
+	rec := req(t, h, http.MethodPost, "/api/auth/login", remoteAddr, `{"username":"alice","password":"alicepw12"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("alice login: want 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	var cookie *http.Cookie
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == sessionCookie {
+			cookie = c
+		}
+	}
+	if cookie == nil {
+		t.Fatal("no session cookie for alice")
+	}
+	// Alice (operator) can reach normal endpoints but NOT user management.
+	if rec := req(t, h, http.MethodGet, "/api/servers", remoteAddr, "", cookie); rec.Code != http.StatusOK {
+		t.Errorf("operator should reach /servers: got %d", rec.Code)
+	}
+	if rec := req(t, h, http.MethodGet, "/api/users", remoteAddr, "", cookie); rec.Code != http.StatusForbidden {
+		t.Errorf("operator must not manage users: want 403, got %d", rec.Code)
+	}
+}
+
 func TestRemoteAccessRequiresPassword(t *testing.T) {
 	h, _, _ := newTestAPI(t)
 	// Enabling remote access without an operator password is rejected.

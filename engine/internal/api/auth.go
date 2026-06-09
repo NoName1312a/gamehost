@@ -3,7 +3,10 @@ package api
 import (
 	"net"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/leop1/gamehost/engine/internal/auth"
 )
 
 // Authentication model: the engine trusts loopback connections (the local
@@ -47,6 +50,26 @@ func (a *API) authed(r *http.Request) bool {
 	return isLoopback(r.RemoteAddr) || a.auth.ValidateSession(sessionToken(r))
 }
 
+// effectiveUser returns the acting account's username and role. Loopback (the
+// local desktop user) is treated as the owner.
+func (a *API) effectiveUser(r *http.Request) (username, role string) {
+	if isLoopback(r.RemoteAddr) {
+		return "owner", auth.RoleOwner
+	}
+	if u, ok := a.auth.SessionUsername(sessionToken(r)); ok {
+		if role, ok := a.auth.UserRole(u); ok {
+			return u, role
+		}
+	}
+	return "", ""
+}
+
+// requireOwner reports whether the caller may manage users.
+func (a *API) requireOwner(r *http.Request) bool {
+	_, role := a.effectiveUser(r)
+	return role == auth.RoleOwner
+}
+
 // requireAuth is middleware that gates protected routes.
 func (a *API) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -61,10 +84,13 @@ func (a *API) requireAuth(next http.Handler) http.Handler {
 // authStatus reports whether the caller is authenticated and whether a password
 // has been set. The UI uses it to decide whether to show a login screen.
 func (a *API) authStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]bool{
+	user, role := a.effectiveUser(r)
+	writeJSON(w, http.StatusOK, map[string]any{
 		"authenticated": a.authed(r),
 		"hasPassword":   a.auth.HasPassword(),
 		"loopback":      isLoopback(r.RemoteAddr),
+		"user":          user,
+		"role":          role,
 	})
 }
 
@@ -76,18 +102,29 @@ func (a *API) authLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
+		Username string `json:"username"`
 		Password string `json:"password"`
 	}
 	if !decodeJSON(w, r, maxControlBody, &body) {
 		return
 	}
-	if !a.auth.Verify(body.Password) {
+	username := strings.TrimSpace(body.Username)
+	ok := false
+	if username == "" {
+		ok = a.auth.Verify(body.Password) // owner (back-compat with password-only login)
+	} else {
+		ok = a.auth.VerifyUser(username, body.Password)
+	}
+	if !ok {
 		a.loginLimiter.fail(ip, time.Now())
-		writeJSON(w, http.StatusUnauthorized, errMsg("incorrect password"))
+		writeJSON(w, http.StatusUnauthorized, errMsg("incorrect username or password"))
 		return
 	}
 	a.loginLimiter.reset(ip)
 	tok := a.auth.CreateSession(sessionTTL)
+	if username != "" {
+		tok = a.auth.CreateSessionFor(username, sessionTTL)
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
 		Value:    tok,

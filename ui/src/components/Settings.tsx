@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type LicenseInfo, type Offsite, type RemoteAccess } from "../lib/api";
+import { api, type LicenseInfo, type Offsite, type RemoteAccess, type UserInfo } from "../lib/api";
 import { appVersion, applyUpdate, checkForUpdate, isDesktop, type UpdateInfo } from "../lib/updater";
 
 export function Settings({
@@ -33,6 +33,43 @@ export function Settings({
   const [offError, setOffError] = useState<string | null>(null);
   const [offSaved, setOffSaved] = useState(false);
 
+  const [isOwner, setIsOwner] = useState(false);
+  const [users, setUsers] = useState<UserInfo[] | null>(null);
+  const [nu, setNu] = useState({ username: "", password: "", role: "operator" });
+  const [usrBusy, setUsrBusy] = useState(false);
+  const [usrError, setUsrError] = useState<string | null>(null);
+
+  function loadUsers() {
+    api
+      .users()
+      .then((r) => setUsers(r.users))
+      .catch(() => setUsers(null));
+  }
+
+  async function addUser() {
+    setUsrBusy(true);
+    setUsrError(null);
+    try {
+      await api.addUser(nu.username.trim(), nu.password, nu.role);
+      setNu({ username: "", password: "", role: "operator" });
+      loadUsers();
+    } catch (e) {
+      setUsrError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUsrBusy(false);
+    }
+  }
+
+  async function removeUser(username: string) {
+    setUsrError(null);
+    try {
+      await api.deleteUser(username);
+      loadUsers();
+    } catch (e) {
+      setUsrError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   useEffect(() => {
     appVersion().then(setAppVer).catch(() => setAppVer(null));
     api.remoteAccess().then(setRemote).catch(() => setRemote(null));
@@ -44,6 +81,15 @@ export function Settings({
         setOffsiteDir(o.dir);
       })
       .catch(() => setOffsite(null));
+    api
+      .authStatus()
+      .then((s) => {
+        if (s.role === "owner") {
+          setIsOwner(true);
+          loadUsers();
+        }
+      })
+      .catch(() => setIsOwner(false));
   }, []);
 
   async function saveOffsite() {
@@ -340,6 +386,60 @@ export function Settings({
           {offSaved && <p className="mt-2 text-xs text-emerald-400">Saved.</p>}
           {offError && <p className="mt-2 text-xs text-rose-400">{offError}</p>}
         </div>
+
+        {isOwner && (
+          <div className="mt-5 border-t border-zinc-800 pt-4">
+            <h3 className="text-sm font-semibold text-zinc-200">Users</h3>
+            <p className="mt-1 text-xs text-zinc-500">
+              Extra accounts that can manage servers over remote access. Only you (owner) can manage them.
+            </p>
+            <div className="mt-2 space-y-1">
+              {(users ?? []).map((u) => (
+                <div key={u.username} className="flex items-center justify-between rounded-lg bg-zinc-950 px-3 py-1.5 text-xs">
+                  <span className="text-zinc-200">
+                    {u.username} <span className="text-zinc-500">· {u.role}</span>
+                  </span>
+                  {u.role !== "owner" && (
+                    <button onClick={() => removeUser(u.username)} className="text-rose-400 hover:text-rose-300">
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 grid grid-cols-[1fr_1fr_auto_auto] gap-2">
+              <input
+                value={nu.username}
+                onChange={(e) => setNu({ ...nu, username: e.target.value })}
+                placeholder="username"
+                className="min-w-0 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-emerald-500"
+              />
+              <input
+                type="password"
+                value={nu.password}
+                onChange={(e) => setNu({ ...nu, password: e.target.value })}
+                placeholder="password"
+                className="min-w-0 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-emerald-500"
+              />
+              <select
+                value={nu.role}
+                onChange={(e) => setNu({ ...nu, role: e.target.value })}
+                className="rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100"
+              >
+                <option value="operator">operator</option>
+                <option value="admin">admin</option>
+              </select>
+              <button
+                onClick={addUser}
+                disabled={usrBusy || !nu.username.trim() || nu.password.length < 8}
+                className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+            {usrError && <p className="mt-2 text-xs text-rose-400">{usrError}</p>}
+          </div>
+        )}
       </div>
     </div>
   );

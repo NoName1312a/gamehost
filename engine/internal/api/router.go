@@ -95,6 +95,10 @@ func NewRouter(d Deps) http.Handler {
 			r.Post("/license", a.setLicense)
 			r.Delete("/license", a.clearLicense)
 
+			r.Get("/users", a.listUsers)
+			r.Post("/users", a.addUser)
+			r.Delete("/users/{username}", a.deleteUser)
+
 			r.Get("/system/runtime", a.runtime)
 			r.Get("/system/setup", a.setupReport)
 			r.Post("/system/setup/{step}", a.runSetupStep)

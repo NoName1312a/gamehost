@@ -162,6 +162,13 @@ export interface AuthStatus {
   authenticated: boolean;
   hasPassword: boolean;
   loopback: boolean;
+  user?: string;
+  role?: string;
+}
+
+export interface UserInfo {
+  username: string;
+  role: string;
 }
 
 export interface RemoteAccess {
@@ -240,6 +247,11 @@ export const api = {
   authStatus: () => get<AuthStatus>("/api/auth/status"),
   login: (password: string) => send<{ status: string; token: string }>("POST", "/api/auth/login", { password }),
   logout: () => send<{ status: string }>("POST", "/api/auth/logout"),
+  users: () => get<{ users: UserInfo[] }>("/api/users"),
+  addUser: (username: string, password: string, role: string) =>
+    send<{ status: string }>("POST", "/api/users", { username, password, role }),
+  deleteUser: (username: string) =>
+    send<{ status: string }>("DELETE", `/api/users/${encodeURIComponent(username)}`),
   setPassword: (newPassword: string, currentPassword?: string) =>
     send<{ status: string }>("POST", "/api/auth/password", { newPassword, currentPassword }),
   remoteAccess: () => get<RemoteAccess>("/api/system/remote-access"),
