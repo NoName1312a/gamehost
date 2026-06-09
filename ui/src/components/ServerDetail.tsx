@@ -489,6 +489,63 @@ function SchedulesPanel({ s, onChanged }: { s: ServerSummary; onChanged: () => v
   );
 }
 
+// ---- mods ------------------------------------------------------------------
+
+function ModsPanel({ s, onChanged }: { s: ServerSummary; onChanged: () => void }) {
+  const [text, setText] = useState((s.mods ?? []).join("\n"));
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setSaving(true);
+    setSaved(false);
+    setError(null);
+    try {
+      const mods = text
+        .split(/[\n,]/)
+        .map((m) => m.trim())
+        .filter(Boolean);
+      await api.setMods(s.id, mods);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-zinc-500">
+        One{" "}
+        <a href="https://modrinth.com" target="_blank" rel="noreferrer" className="text-emerald-400 hover:underline">
+          Modrinth
+        </a>{" "}
+        project slug per line (e.g. <span className="font-mono text-zinc-300">sodium</span>,{" "}
+        <span className="font-mono text-zinc-300">fabric-api</span>). They're installed automatically on the next start.
+        Pro feature.
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={4}
+        placeholder={"sodium\nlithium\nfabric-api"}
+        className={`${fieldCls} font-mono`}
+      />
+      {error && <p className="text-xs text-rose-400">{error}</p>}
+      <div className="flex items-center gap-3">
+        <button onClick={save} disabled={saving} className={primaryBtn}>
+          {saving ? "Saving…" : "Save mods"}
+        </button>
+        {saved && <span className="text-sm text-emerald-400">Saved ✓ — restart to apply</span>}
+      </div>
+    </div>
+  );
+}
+
 // ---- resources -------------------------------------------------------------
 
 function Sparkline({ data, max, color }: { data: number[]; max: number; color: string }) {
@@ -811,6 +868,14 @@ export function ServerDetail({
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Schedules</h3>
             <SchedulesPanel s={server} onChanged={onChanged} />
           </section>
+
+          {/* Mods (Minecraft) */}
+          {template?.runtime === "java" && (
+            <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5">
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Mods &amp; plugins</h3>
+              <ModsPanel s={server} onChanged={onChanged} />
+            </section>
+          )}
         </div>
       </div>
 

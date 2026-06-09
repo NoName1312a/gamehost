@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -38,8 +39,11 @@ type Server struct {
 	Ports         []docker.PortMapping `json:"ports"`
 	MemoryMB      int                  `json:"memoryMB"`
 	// CPUs caps CPU cores for this server (e.g. 1.5). 0 leaves CPU uncapped.
-	CPUs          float64 `json:"cpus,omitempty"`
-	DataPath      string  `json:"dataPath"`
+	CPUs float64 `json:"cpus,omitempty"`
+	// Mods are Modrinth project slugs auto-installed by the image on start
+	// (Minecraft). Pro-only; applied via the MODRINTH_PROJECTS env var.
+	Mods          []string `json:"mods,omitempty"`
+	DataPath      string   `json:"dataPath"`
 	CommandMethod string               `json:"commandMethod"`
 	CreatedAt     string               `json:"createdAt"`
 	// RelayAddress is the public playit.gg address the user pasted back from
@@ -588,10 +592,18 @@ func (m *Manager) Update(ctx context.Context, id string, req UpdateRequest) (*Se
 }
 
 func (m *Manager) specFor(s *Server) docker.CreateSpec {
+	env := s.Env
+	if len(s.Mods) > 0 {
+		env = make(map[string]string, len(s.Env)+1)
+		for k, v := range s.Env {
+			env[k] = v
+		}
+		env["MODRINTH_PROJECTS"] = strings.Join(s.Mods, ",")
+	}
 	return docker.CreateSpec{
 		Name:      s.ContainerName(),
 		Image:     s.Image,
-		Env:       s.Env,
+		Env:       env,
 		Ports:     s.Ports,
 		MemoryMB:  s.MemoryMB,
 		CPUs:      s.CPUs,
@@ -599,6 +611,55 @@ func (m *Manager) specFor(s *Server) docker.CreateSpec {
 		DataPath:  s.DataPath,
 		OpenStdin: true,
 	}
+}
+
+// modSlugRe matches a Modrinth project slug/id (no shell-special chars, no comma
+// since that's the list separator).
+var modSlugRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
+// SetMods sets a server's auto-installed mod list (Pro). Validates the slugs,
+// persists them, and recreates the container (keeping the data volume) so the
+// new MODRINTH_PROJECTS takes effect; restarts it if it was running.
+func (m *Manager) SetMods(ctx context.Context, id string, mods []string) error {
+	if !m.proEnabled() {
+		return fmt.Errorf("the mod manager is a Pro feature — upgrade to enable it")
+	}
+	clean := make([]string, 0, len(mods))
+	for _, mod := range mods {
+		mod = strings.TrimSpace(mod)
+		if mod == "" {
+			continue
+		}
+		if !modSlugRe.MatchString(mod) {
+			return fmt.Errorf("%q isn't a valid mod id — use the Modrinth project slug, e.g. sodium", mod)
+		}
+		clean = append(clean, mod)
+	}
+	m.mu.Lock()
+	s, ok := m.items[id]
+	if !ok {
+		m.mu.Unlock()
+		return fmt.Errorf("server not found")
+	}
+	s.Mods = clean
+	err := m.save()
+	m.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	// Apply: env changes need a fresh container. Keep the data volume.
+	st := m.rt.Inspect(ctx, s.ContainerName())
+	if st.Exists {
+		wasRunning := st.Running
+		if wasRunning {
+			_ = m.Stop(ctx, id)
+		}
+		_ = m.rt.Remove(ctx, s.ContainerName())
+		if wasRunning {
+			return m.Start(ctx, id)
+		}
+	}
+	return nil
 }
 
 // Start launches the container (first time: docker run, which pulls the image)

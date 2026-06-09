@@ -136,6 +136,7 @@ export interface ServerSummary {
   ports: PortMapping[];
   memoryMB: number;
   cpus?: number; // CPU-core cap; 0/absent = uncapped
+  mods?: string[]; // Modrinth project slugs (Minecraft, Pro)
   dataPath: string;
   commandMethod: string;
   createdAt: string;
@@ -279,6 +280,7 @@ export const api = {
     send<{ status: string }>("DELETE", `/api/servers/${id}/backups?file=${encodeURIComponent(file)}`),
   setSchedule: (id: string, restartAt: string, backupAt: string) =>
     send<{ status: string }>("PUT", `/api/servers/${id}/schedule`, { restartAt, backupAt }),
+  setMods: (id: string, mods: string[]) => send<{ status: string }>("PUT", `/api/servers/${id}/mods`, { mods }),
   stats: (id: string) => get<Stats>(`/api/servers/${id}/stats`),
   templates: () => get<Template[]>("/api/templates"),
   servers: () => get<ServerSummary[]>("/api/servers"),

@@ -498,6 +498,42 @@ func TestFreeTierCapsRunningServers(t *testing.T) {
 	}
 }
 
+func TestSetModsProGatedAndAppliesToSpec(t *testing.T) {
+	reg := testRegistry(t)
+	rt := &fakeRuntime{} // not running -> SetMods just persists; Start captures spec
+	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	if err != nil {
+		t.Fatalf("new manager: %v", err)
+	}
+	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "M", Port: 25565})
+	ctx := context.Background()
+
+	// Free tier is blocked.
+	m.SetEntitlement(func() bool { return false })
+	if err := m.SetMods(ctx, s.ID, []string{"sodium"}); err == nil || !strings.Contains(err.Error(), "Pro") {
+		t.Fatalf("free mod manager should be blocked, got %v", err)
+	}
+
+	m.SetEntitlement(func() bool { return true })
+	// Invalid slug is rejected.
+	if err := m.SetMods(ctx, s.ID, []string{"bad slug!"}); err == nil {
+		t.Fatal("invalid mod slug should be rejected")
+	}
+	// Valid slugs persist and flow into the container spec.
+	if err := m.SetMods(ctx, s.ID, []string{"sodium", "fabric-api"}); err != nil {
+		t.Fatalf("set mods: %v", err)
+	}
+	if got, _ := m.Get(s.ID); len(got.Mods) != 2 {
+		t.Errorf("mods not persisted: %v", got.Mods)
+	}
+	if err := m.Start(ctx, s.ID); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if rt.lastSpec.Env["MODRINTH_PROJECTS"] != "sodium,fabric-api" {
+		t.Errorf("MODRINTH_PROJECTS not set in spec: %v", rt.lastSpec.Env)
+	}
+}
+
 func TestFreeTierCannotSchedule(t *testing.T) {
 	m, _ := newTestManager(t)
 	m.SetEntitlement(func() bool { return false })

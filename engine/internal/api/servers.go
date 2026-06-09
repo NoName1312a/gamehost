@@ -77,4 +77,21 @@ func (a *API) deleteServer(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
+func (a *API) setMods(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Mods []string `json:"mods"`
+	}
+	if !decodeJSON(w, r, maxControlBody, &body) {
+		return
+	}
+	// Recreating the server to apply mods can re-pull the image.
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
+	defer cancel()
+	if err := a.mgr.SetMods(ctx, chi.URLParam(r, "id"), body.Mods); err != nil {
+		writeJSON(w, http.StatusBadRequest, errMsg(err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
+}
+
 func errMsg(s string) map[string]string { return map[string]string{"error": s} }
