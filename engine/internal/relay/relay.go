@@ -13,6 +13,7 @@ package relay
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"os"
 	"os/exec"
@@ -20,7 +21,13 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/leop1/gamehost/engine/internal/secret"
 )
+
+// secretPrefix marks the new (DPAPI-encrypted, base64) on-disk secret format,
+// distinguishing it from legacy plaintext secrets so both load correctly.
+const secretPrefix = "gh1:"
 
 const (
 	// SetupURL generates a secret key (the headless/Docker agent flow).
@@ -64,7 +71,20 @@ func (a *Agent) secret() string {
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(b))
+	content := strings.TrimSpace(string(b))
+	rest, ok := strings.CutPrefix(content, secretPrefix)
+	if !ok {
+		return content // legacy plaintext secret
+	}
+	enc, err := base64.StdEncoding.DecodeString(rest)
+	if err != nil {
+		return ""
+	}
+	dec, err := secret.Unprotect(enc)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(dec))
 }
 
 func (a *Agent) linked() bool { return a.secret() != "" }
@@ -95,16 +115,22 @@ func (a *Agent) Running() bool {
 	return a.running
 }
 
-// Link stores the secret key and (re)starts the daemon with it.
-func (a *Agent) Link(secret string) error {
-	secret = strings.TrimSpace(secret)
-	if secret == "" {
+// Link stores the secret key (DPAPI-encrypted on Windows) and (re)starts the
+// daemon with it.
+func (a *Agent) Link(key string) error {
+	key = strings.TrimSpace(key)
+	if key == "" {
 		return errors.New("secret key is empty")
 	}
 	if err := os.MkdirAll(a.dataDir, 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(a.secretFile(), []byte(secret), 0o600); err != nil {
+	enc, err := secret.Protect([]byte(key))
+	if err != nil {
+		return err
+	}
+	data := secretPrefix + base64.StdEncoding.EncodeToString(enc)
+	if err := os.WriteFile(a.secretFile(), []byte(data), 0o600); err != nil {
 		return err
 	}
 	a.Stop()
