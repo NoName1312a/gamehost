@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -278,6 +279,59 @@ func (m *Manager) save() error {
 	return os.Rename(tmp, m.path)
 }
 
+// validateName trims and checks a server's display name (length + control chars).
+func validateName(raw string) (string, error) {
+	name := strings.TrimSpace(raw)
+	if len([]rune(name)) > 60 {
+		return "", fmt.Errorf("server name is too long (max 60 characters)")
+	}
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f {
+			return "", fmt.Errorf("server name contains invalid characters")
+		}
+	}
+	return name, nil
+}
+
+// validateVariables checks user-provided values against the template's declared
+// variable types/options, so a bad value fails fast with a friendly message
+// instead of breaking the container at start.
+func validateVariables(t templates.Template, vars map[string]string) error {
+	defs := make(map[string]templates.Variable, len(t.Variables))
+	for _, v := range t.Variables {
+		defs[v.Key] = v
+	}
+	for k, val := range vars {
+		def, ok := defs[k]
+		if !ok {
+			continue // unknown keys pass through (some templates accept extra env)
+		}
+		val = strings.TrimSpace(val)
+		if val == "" {
+			continue
+		}
+		label := def.Label
+		if label == "" {
+			label = def.Key
+		}
+		switch def.Type {
+		case "int":
+			if _, err := strconv.Atoi(val); err != nil {
+				return fmt.Errorf("%s must be a whole number", label)
+			}
+		case "bool":
+			if lv := strings.ToLower(val); lv != "true" && lv != "false" {
+				return fmt.Errorf("%s must be true or false", label)
+			}
+		case "enum":
+			if len(def.Options) > 0 && !slices.Contains(def.Options, val) {
+				return fmt.Errorf("%s must be one of: %s", label, strings.Join(def.Options, ", "))
+			}
+		}
+	}
+	return nil
+}
+
 func genID() string {
 	var b [6]byte
 	_, _ = rand.Read(b[:])
@@ -314,9 +368,15 @@ func (m *Manager) Create(req CreateRequest) (*Server, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown template %q", req.TemplateID)
 	}
-	name := strings.TrimSpace(req.Name)
+	name, err := validateName(req.Name)
+	if err != nil {
+		return nil, err
+	}
 	if name == "" {
 		name = t.Name
+	}
+	if err := validateVariables(t, req.Variables); err != nil {
+		return nil, err
 	}
 
 	env := map[string]string{}
@@ -438,9 +498,17 @@ func (m *Manager) Update(ctx context.Context, id string, req UpdateRequest) (*Se
 	}
 
 	// Compute (and validate) the new values before mutating anything.
-	name := strings.TrimSpace(req.Name)
+	name, err := validateName(req.Name)
+	if err != nil {
+		m.mu.Unlock()
+		return nil, err
+	}
 	if name == "" {
 		name = s.Name
+	}
+	if err := validateVariables(t, req.Variables); err != nil {
+		m.mu.Unlock()
+		return nil, err
 	}
 
 	env := map[string]string{}

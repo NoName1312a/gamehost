@@ -97,6 +97,11 @@ env:
 variables:
   - key: VERSION
     default: LATEST
+  - key: MODE
+    type: enum
+    options: [survival, creative]
+  - key: SLOTS
+    type: int
 `
 
 func newTestManager(t *testing.T) (*Manager, string) {
@@ -172,6 +177,33 @@ func TestCreateAppliesCPUsToSpec(t *testing.T) {
 	}
 	if rt.lastSpec.CPUs != 2 {
 		t.Errorf("CPUs not carried into container spec: got %v want 2", rt.lastSpec.CPUs)
+	}
+}
+
+func TestCreateValidatesVariableTypes(t *testing.T) {
+	m, _ := newTestManager(t)
+	// enum out of range is rejected.
+	if _, err := m.Create(CreateRequest{TemplateID: "test-mc", Name: "A", Port: 25565, Variables: map[string]string{"MODE": "nope"}}); err == nil || !strings.Contains(err.Error(), "one of") {
+		t.Fatalf("invalid enum should be rejected, got %v", err)
+	}
+	// non-numeric int is rejected.
+	if _, err := m.Create(CreateRequest{TemplateID: "test-mc", Name: "B", Port: 25566, Variables: map[string]string{"SLOTS": "lots"}}); err == nil || !strings.Contains(err.Error(), "number") {
+		t.Fatalf("invalid int should be rejected, got %v", err)
+	}
+	// valid values pass.
+	if _, err := m.Create(CreateRequest{TemplateID: "test-mc", Name: "C", Port: 25567, Variables: map[string]string{"MODE": "creative", "SLOTS": "20"}}); err != nil {
+		t.Fatalf("valid variables should pass: %v", err)
+	}
+}
+
+func TestCreateValidatesName(t *testing.T) {
+	m, _ := newTestManager(t)
+	long := strings.Repeat("x", 61)
+	if _, err := m.Create(CreateRequest{TemplateID: "test-mc", Name: long, Port: 25565}); err == nil || !strings.Contains(err.Error(), "too long") {
+		t.Fatalf("over-long name should be rejected, got %v", err)
+	}
+	if _, err := m.Create(CreateRequest{TemplateID: "test-mc", Name: "bad\x01name", Port: 25566}); err == nil || !strings.Contains(err.Error(), "invalid") {
+		t.Fatalf("control chars should be rejected, got %v", err)
 	}
 }
 
