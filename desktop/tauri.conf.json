@@ -45,7 +45,7 @@
       "icons/icon.ico"
     ],
     "externalBin": ["binaries/engine", "binaries/playit"],
-    "resources": ["resources/templates/*"],
+    "resources": ["resources/templates/*", "resources/uninstall-cleanup.ps1"],
     "windows": {
       "webviewInstallMode": { "type": "downloadBootstrapper" },
       "nsis": {

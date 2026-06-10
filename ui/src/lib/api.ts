@@ -269,6 +269,7 @@ export const api = {
   setOffsite: (dir: string) => send<Offsite>("POST", "/api/system/offsite", { dir }),
   telemetry: () => get<Telemetry>("/api/system/telemetry"),
   setTelemetry: (enabled: boolean) => send<Telemetry>("POST", "/api/system/telemetry", { enabled }),
+  purge: () => send<{ removed: number }>("POST", "/api/system/purge"),
   runtime: () => get<Runtime>("/api/system/runtime"),
   setup: () => get<Setup>("/api/system/setup"),
   // endpoint is the absolute API path from a SetupStep's action (e.g. /api/system/setup/start-docker).

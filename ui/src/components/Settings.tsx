@@ -37,6 +37,9 @@ export function Settings({
   const [telBusy, setTelBusy] = useState(false);
   const [telError, setTelError] = useState<string | null>(null);
 
+  const [purgeBusy, setPurgeBusy] = useState(false);
+  const [purgeMsg, setPurgeMsg] = useState<string | null>(null);
+
   const [isOwner, setIsOwner] = useState(false);
   const [users, setUsers] = useState<UserInfo[] | null>(null);
   const [nu, setNu] = useState({ username: "", password: "", role: "operator" });
@@ -123,6 +126,22 @@ export function Settings({
       setTelError(e instanceof Error ? e.message : String(e));
     } finally {
       setTelBusy(false);
+    }
+  }
+
+  async function removeAllServers() {
+    if (!window.confirm("Remove ALL servers, their saved worlds, and Docker volumes? This cannot be undone.")) {
+      return;
+    }
+    setPurgeBusy(true);
+    setPurgeMsg(null);
+    try {
+      const r = await api.purge();
+      setPurgeMsg(`Removed ${r.removed} server${r.removed === 1 ? "" : "s"}. Close settings to refresh.`);
+    } catch (e) {
+      setPurgeMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPurgeBusy(false);
     }
   }
 
@@ -427,6 +446,22 @@ export function Settings({
             </button>
           )}
           {telError && <p className="mt-2 text-xs text-rose-400">{telError}</p>}
+        </div>
+
+        <div className="mt-5 border-t border-zinc-800 pt-4">
+          <h3 className="text-sm font-semibold text-rose-300">Danger zone</h3>
+          <p className="mt-1 text-xs text-zinc-500">
+            Permanently remove every server, its saved world, and its Docker volume. Your settings and
+            license stay. This cannot be undone.
+          </p>
+          <button
+            onClick={removeAllServers}
+            disabled={purgeBusy}
+            className="mt-3 w-full rounded-lg border border-rose-500/40 px-3 py-2 text-sm font-semibold text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
+          >
+            {purgeBusy ? "Removing…" : "Remove all servers"}
+          </button>
+          {purgeMsg && <p className="mt-2 text-xs text-zinc-400">{purgeMsg}</p>}
         </div>
 
         {isOwner && (

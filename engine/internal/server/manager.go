@@ -776,6 +776,32 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 	return err
 }
 
+// PurgeAll removes every server — its container, data volume, port mappings, and
+// record. It backs the uninstaller's opt-in "remove all game data" step. It is
+// best-effort per server: it returns how many were removed and the first error
+// encountered, so a single stuck container doesn't block clearing the rest.
+func (m *Manager) PurgeAll(ctx context.Context) (int, error) {
+	m.mu.Lock()
+	ids := make([]string, 0, len(m.items))
+	for id := range m.items {
+		ids = append(ids, id)
+	}
+	m.mu.Unlock()
+
+	removed := 0
+	var firstErr error
+	for _, id := range ids {
+		if err := m.Delete(ctx, id); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		removed++
+	}
+	return removed, firstErr
+}
+
 // mapPorts forwards each of the server's ports on the router. Best-effort: a
 // missing/unsupported UPnP router is the common case and isn't an error.
 func (m *Manager) mapPorts(ctx context.Context, s *Server) {

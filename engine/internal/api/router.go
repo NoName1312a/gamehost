@@ -112,6 +112,7 @@ func NewRouter(d Deps) http.Handler {
 			r.Post("/system/offsite", a.setOffsite)
 			r.Get("/system/telemetry", a.telemetryStatus)
 			r.Post("/system/telemetry", a.setTelemetry)
+			r.Post("/system/purge", a.purgeData)
 			r.Get("/system/relay", a.relayStatus)
 			r.Post("/system/relay/link", a.relayLink)
 			r.Post("/system/relay/{action}", a.relayAction)
