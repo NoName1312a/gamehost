@@ -16,6 +16,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/license"
 	"github.com/leop1/gamehost/engine/internal/remote"
 	"github.com/leop1/gamehost/engine/internal/server"
+	"github.com/leop1/gamehost/engine/internal/telemetry"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
 
@@ -75,6 +76,7 @@ func newTestAPIFull(t *testing.T) (http.Handler, *server.Manager, *auth.Store, *
 	h := NewRouter(Deps{
 		Cfg: cfg, RT: rt, Reg: reg, Mgr: mgr, Auth: au, Remote: rc,
 		Audit: audit.New(&auditBuf), License: lic,
+		Telemetry: telemetry.NewStore(t.TempDir()),
 	})
 	return h, mgr, au, &auditBuf
 }

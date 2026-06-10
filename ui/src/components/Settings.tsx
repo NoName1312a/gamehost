@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type LicenseInfo, type Offsite, type RemoteAccess, type UserInfo } from "../lib/api";
+import { api, type LicenseInfo, type Offsite, type RemoteAccess, type Telemetry, type UserInfo } from "../lib/api";
 import { appVersion, applyUpdate, checkForUpdate, isDesktop, type UpdateInfo } from "../lib/updater";
 
 export function Settings({
@@ -32,6 +32,10 @@ export function Settings({
   const [offBusy, setOffBusy] = useState(false);
   const [offError, setOffError] = useState<string | null>(null);
   const [offSaved, setOffSaved] = useState(false);
+
+  const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
+  const [telBusy, setTelBusy] = useState(false);
+  const [telError, setTelError] = useState<string | null>(null);
 
   const [isOwner, setIsOwner] = useState(false);
   const [users, setUsers] = useState<UserInfo[] | null>(null);
@@ -81,6 +85,7 @@ export function Settings({
         setOffsiteDir(o.dir);
       })
       .catch(() => setOffsite(null));
+    api.telemetry().then(setTelemetry).catch(() => setTelemetry(null));
     api
       .authStatus()
       .then((s) => {
@@ -105,6 +110,19 @@ export function Settings({
       setOffError(e instanceof Error ? e.message : String(e));
     } finally {
       setOffBusy(false);
+    }
+  }
+
+  async function toggleTelemetry() {
+    if (!telemetry) return;
+    setTelBusy(true);
+    setTelError(null);
+    try {
+      setTelemetry(await api.setTelemetry(!telemetry.enabled));
+    } catch (e) {
+      setTelError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTelBusy(false);
     }
   }
 
@@ -385,6 +403,30 @@ export function Settings({
           </div>
           {offSaved && <p className="mt-2 text-xs text-emerald-400">Saved.</p>}
           {offError && <p className="mt-2 text-xs text-rose-400">{offError}</p>}
+        </div>
+
+        <div className="mt-5 border-t border-zinc-800 pt-4">
+          <h3 className="text-sm font-semibold text-zinc-200">Diagnostics</h3>
+          <p className="mt-1 text-xs text-zinc-500">
+            Help improve GameHost by sharing anonymous crash reports and basic usage (app version, OS).
+            Off by default, never includes personal data, and you can turn it off anytime.
+          </p>
+          {telemetry === null ? (
+            <p className="mt-2 text-xs text-zinc-500">…</p>
+          ) : (
+            <button
+              onClick={toggleTelemetry}
+              disabled={telBusy}
+              className={`mt-3 w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
+                telemetry.enabled
+                  ? "border border-zinc-700 text-zinc-200 hover:bg-zinc-800"
+                  : "bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+              }`}
+            >
+              {telBusy ? "…" : telemetry.enabled ? "Turn off diagnostics" : "Turn on diagnostics"}
+            </button>
+          )}
+          {telError && <p className="mt-2 text-xs text-rose-400">{telError}</p>}
         </div>
 
         {isOwner && (

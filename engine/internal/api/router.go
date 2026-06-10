@@ -21,6 +21,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/relay"
 	"github.com/leop1/gamehost/engine/internal/remote"
 	"github.com/leop1/gamehost/engine/internal/server"
+	"github.com/leop1/gamehost/engine/internal/telemetry"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
 
@@ -38,8 +39,9 @@ type Deps struct {
 	Relay   *relay.Agent
 	Auth    *auth.Store
 	Remote  *remote.Controller
-	Audit   *audit.Logger
-	License *license.Store
+	Audit     *audit.Logger
+	License   *license.Store
+	Telemetry *telemetry.Store
 }
 
 // API bundles the dependencies handlers need.
@@ -54,6 +56,7 @@ type API struct {
 	remote       *remote.Controller
 	audit        *audit.Logger
 	license      *license.Store
+	telemetry    *telemetry.Store
 	loginLimiter *loginLimiter
 }
 
@@ -61,7 +64,7 @@ type API struct {
 // handler to the remote controller so the remote listener serves the same API.
 func NewRouter(d Deps) http.Handler {
 	a := &API{cfg: d.Cfg, rt: d.RT, reg: d.Reg, mgr: d.Mgr, net: d.Net, relay: d.Relay,
-		auth: d.Auth, remote: d.Remote, audit: d.Audit, license: d.License,
+		auth: d.Auth, remote: d.Remote, audit: d.Audit, license: d.License, telemetry: d.Telemetry,
 		loginLimiter: newLoginLimiter(5, 5*time.Minute)}
 
 	r := chi.NewRouter()
@@ -107,6 +110,8 @@ func NewRouter(d Deps) http.Handler {
 			r.Post("/system/remote-access", a.setRemoteAccess)
 			r.Get("/system/offsite", a.offsiteStatus)
 			r.Post("/system/offsite", a.setOffsite)
+			r.Get("/system/telemetry", a.telemetryStatus)
+			r.Post("/system/telemetry", a.setTelemetry)
 			r.Get("/system/relay", a.relayStatus)
 			r.Post("/system/relay/link", a.relayLink)
 			r.Post("/system/relay/{action}", a.relayAction)

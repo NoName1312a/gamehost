@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -23,7 +24,9 @@ import (
 	"github.com/leop1/gamehost/engine/internal/network"
 	"github.com/leop1/gamehost/engine/internal/relay"
 	"github.com/leop1/gamehost/engine/internal/remote"
+	"github.com/leop1/gamehost/engine/internal/safe"
 	"github.com/leop1/gamehost/engine/internal/server"
+	"github.com/leop1/gamehost/engine/internal/telemetry"
 	"github.com/leop1/gamehost/engine/internal/templates"
 )
 
@@ -31,6 +34,14 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	cfg := config.Load()
+
+	// Opt-in, off-by-default diagnostics. The endpoint is empty unless configured
+	// via GAMEHOST_TELEMETRY_URL; with no endpoint, telemetry is a complete no-op
+	// even after opt-in, so nothing leaves the machine.
+	telStore := telemetry.NewStore(cfg.DataDir)
+	reporter := telemetry.NewReporter(telStore, os.Getenv("GAMEHOST_TELEMETRY_URL"), api.Version)
+	safe.OnPanic = reporter.ReportPanic   // report background-goroutine panics
+	defer reporter.Recover("engine-main") // and a panic on the main goroutine
 
 	rt := docker.New()
 	netMapper := network.New()
@@ -71,6 +82,7 @@ func main() {
 		Handler: api.NewRouter(api.Deps{
 			Cfg: cfg, RT: rt, Reg: reg, Mgr: mgr, Net: netMapper, Relay: relayAgent,
 			Auth: authStore, Remote: remoteCtrl, Audit: auditLog, License: licenseStore,
+			Telemetry: telStore,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
@@ -95,6 +107,9 @@ func main() {
 			os.Exit(1)
 		}
 	}()
+
+	// Anonymous startup ping (no-op unless opted in + endpoint configured).
+	reporter.Send(telemetry.Event{Type: "engine_start", Data: map[string]string{"os": runtime.GOOS}})
 
 	// Shut down on a signal OR when our parent (the desktop shell) exits. The
 	// shell spawns us with a stdin pipe and sets GAMEHOST_PARENT_WATCH; when the

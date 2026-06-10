@@ -190,6 +190,11 @@ export interface Offsite {
   pro: boolean;
 }
 
+export interface Telemetry {
+  enabled: boolean;
+  version: string;
+}
+
 export interface Stats {
   cpuPercent: number;
   memUsedMB: number;
@@ -262,6 +267,8 @@ export const api = {
   clearLicense: () => send<LicenseInfo>("DELETE", "/api/license"),
   offsite: () => get<Offsite>("/api/system/offsite"),
   setOffsite: (dir: string) => send<Offsite>("POST", "/api/system/offsite", { dir }),
+  telemetry: () => get<Telemetry>("/api/system/telemetry"),
+  setTelemetry: (enabled: boolean) => send<Telemetry>("POST", "/api/system/telemetry", { enabled }),
   runtime: () => get<Runtime>("/api/system/runtime"),
   setup: () => get<Setup>("/api/system/setup"),
   // endpoint is the absolute API path from a SetupStep's action (e.g. /api/system/setup/start-docker).
