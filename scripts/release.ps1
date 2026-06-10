@@ -48,11 +48,35 @@ if ($LASTEXITCODE -ne 0) { throw "tauri signer sign failed (exit $LASTEXITCODE)"
 $sigPath = "$($setup.FullName).sig"
 if (-not (Test-Path $sigPath)) { throw "signature not found after signing: $sigPath" }
 
+# --- release notes: pull this version's section out of CHANGELOG.md, so the
+# in-app updater dialog and the GitHub release body show real notes. Falls back
+# to a generic line if the version has no section yet. ---
+$notes = "GameHost $Version"
+$changelogPath = Join-Path $root "CHANGELOG.md"
+if (Test-Path $changelogPath) {
+  $lines = Get-Content $changelogPath -Encoding UTF8
+  $start = -1
+  for ($i = 0; $i -lt $lines.Count; $i++) {
+    if ($lines[$i] -match "^##\s*\[$([regex]::Escape($Version))\]") { $start = $i + 1; break }
+  }
+  if ($start -ge 0) {
+    $collected = @()
+    for ($j = $start; $j -lt $lines.Count; $j++) {
+      if ($lines[$j] -match "^##\s*\[") { break }
+      $collected += $lines[$j]
+    }
+    $body = ($collected -join "`n").Trim()
+    if ($body) { $notes = $body }
+  } else {
+    Write-Warning "CHANGELOG.md has no section for [$Version]; using a generic note."
+  }
+}
+
 # --- assemble latest.json (the updater manifest) ---
 $assetUrl = "https://github.com/$repo/releases/download/$tag/$($setup.Name)"
 $manifest = [ordered]@{
   version   = $Version
-  notes     = "GameHost $Version"
+  notes     = $notes
   pub_date  = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
   platforms = [ordered]@{
     "windows-x86_64" = [ordered]@{
@@ -68,5 +92,5 @@ $json = $manifest | ConvertTo-Json -Depth 6
 [System.IO.File]::WriteAllText($latestPath, $json, (New-Object System.Text.UTF8Encoding $false))
 
 # --- publish (installer + manifest) as the latest release ---
-& $gh release create $tag $setup.FullName $latestPath --repo $repo --title "GameHost $Version" --notes "Automated release of GameHost $Version."
+& $gh release create $tag $setup.FullName $latestPath --repo $repo --title "GameHost $Version" --notes $notes
 Write-Host "Published $tag to $repo" -ForegroundColor Green
