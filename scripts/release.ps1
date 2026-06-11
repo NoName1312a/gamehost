@@ -91,6 +91,12 @@ $latestPath = Join-Path $nsisDir "latest.json"
 $json = $manifest | ConvertTo-Json -Depth 6
 [System.IO.File]::WriteAllText($latestPath, $json, (New-Object System.Text.UTF8Encoding $false))
 
-# --- publish (installer + manifest) as the latest release ---
-& $gh release create $tag $setup.FullName $latestPath --repo $repo --title "GameNest $Version" --notes $notes
+# --- publish (installer + manifest) as the latest release. Write the notes to a
+# file and pass --notes-file: handing multi-line markdown to gh via --notes lets
+# cobra misparse tokens like "->" as flags. Also check the exit code so a failed
+# publish doesn't masquerade as success. ---
+$notesPath = Join-Path $nsisDir "release-notes.md"
+[System.IO.File]::WriteAllText($notesPath, $notes, (New-Object System.Text.UTF8Encoding $false))
+& $gh release create $tag $setup.FullName $latestPath --repo $repo --title "GameNest $Version" --notes-file $notesPath
+if ($LASTEXITCODE -ne 0) { throw "gh release create failed (exit $LASTEXITCODE)" }
 Write-Host "Published $tag to $repo" -ForegroundColor Green
