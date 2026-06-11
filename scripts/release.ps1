@@ -51,7 +51,7 @@ if (-not (Test-Path $sigPath)) { throw "signature not found after signing: $sigP
 # --- release notes: pull this version's section out of CHANGELOG.md, so the
 # in-app updater dialog and the GitHub release body show real notes. Falls back
 # to a generic line if the version has no section yet. ---
-$notes = "GameHost $Version"
+$notes = "GameNest $Version"
 $changelogPath = Join-Path $root "CHANGELOG.md"
 if (Test-Path $changelogPath) {
   $lines = Get-Content $changelogPath -Encoding UTF8
@@ -92,5 +92,5 @@ $json = $manifest | ConvertTo-Json -Depth 6
 [System.IO.File]::WriteAllText($latestPath, $json, (New-Object System.Text.UTF8Encoding $false))
 
 # --- publish (installer + manifest) as the latest release ---
-& $gh release create $tag $setup.FullName $latestPath --repo $repo --title "GameHost $Version" --notes $notes
+& $gh release create $tag $setup.FullName $latestPath --repo $repo --title "GameNest $Version" --notes $notes
 Write-Host "Published $tag to $repo" -ForegroundColor Green

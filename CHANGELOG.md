@@ -9,6 +9,8 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-11
+
 ### Changed
 - **GameNest is now free and open source (AGPLv3).** Every feature is unlocked for everyone — there is no longer a paid "Pro" tier. Unlimited concurrent servers, scheduled backups & restarts, off-site backups, and the Minecraft mod manager are now free for all.
 - Renamed the app from "GameHost" to **GameNest** (the engine, repo, and updater feed keep the internal `gamehost` name for now).
