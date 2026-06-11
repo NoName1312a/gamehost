@@ -467,38 +467,28 @@ func TestLoadRecoversFromBak(t *testing.T) {
 	}
 }
 
-func TestFreeTierCapsRunningServers(t *testing.T) {
+func TestNoRunningServerCap(t *testing.T) {
 	reg := testRegistry(t)
 	rt := &fakeRuntime{running: map[string]bool{}}
 	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
-	m.SetEntitlement(func() bool { return false }) // free tier
 
 	a, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "A", Port: 25565})
 	b, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "B", Port: 25566})
 	c, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "C", Port: 25567})
 
+	// Running many servers at once is free for everyone — no cap.
 	ctx := context.Background()
-	if err := m.Start(ctx, a.ID); err != nil {
-		t.Fatalf("start A: %v", err)
-	}
-	if err := m.Start(ctx, b.ID); err != nil {
-		t.Fatalf("start B: %v", err)
-	}
-	if err := m.Start(ctx, c.ID); err == nil || !strings.Contains(err.Error(), "free plan") {
-		t.Fatalf("3rd start on free tier should be blocked, got %v", err)
-	}
-
-	// Upgrading to Pro lifts the cap.
-	m.SetEntitlement(func() bool { return true })
-	if err := m.Start(ctx, c.ID); err != nil {
-		t.Errorf("Pro should allow the 3rd server: %v", err)
+	for _, s := range []*Server{a, b, c} {
+		if err := m.Start(ctx, s.ID); err != nil {
+			t.Fatalf("start %s should succeed (no cap), got %v", s.Name, err)
+		}
 	}
 }
 
-func TestSetModsProGatedAndAppliesToSpec(t *testing.T) {
+func TestSetModsAppliesToSpec(t *testing.T) {
 	reg := testRegistry(t)
 	rt := &fakeRuntime{} // not running -> SetMods just persists; Start captures spec
 	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
@@ -508,13 +498,11 @@ func TestSetModsProGatedAndAppliesToSpec(t *testing.T) {
 	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "M", Port: 25565})
 	ctx := context.Background()
 
-	// Free tier is blocked.
-	m.SetEntitlement(func() bool { return false })
-	if err := m.SetMods(ctx, s.ID, []string{"sodium"}); err == nil || !strings.Contains(err.Error(), "Pro") {
-		t.Fatalf("free mod manager should be blocked, got %v", err)
+	// The mod manager is free for everyone.
+	if err := m.SetMods(ctx, s.ID, []string{"sodium"}); err != nil {
+		t.Fatalf("mod manager should be free, got %v", err)
 	}
 
-	m.SetEntitlement(func() bool { return true })
 	// Invalid slug is rejected.
 	if err := m.SetMods(ctx, s.ID, []string{"bad slug!"}); err == nil {
 		t.Fatal("invalid mod slug should be rejected")
@@ -534,26 +522,21 @@ func TestSetModsProGatedAndAppliesToSpec(t *testing.T) {
 	}
 }
 
-func TestFreeTierCannotSchedule(t *testing.T) {
+func TestScheduleIsFree(t *testing.T) {
 	m, _ := newTestManager(t)
-	m.SetEntitlement(func() bool { return false })
 	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "S", Port: 25565})
 
-	if err := m.SetSchedule(s.ID, "03:00", ""); err == nil || !strings.Contains(err.Error(), "Pro") {
-		t.Fatalf("free tier should not set a schedule, got %v", err)
-	}
-	// Clearing a schedule is always allowed.
-	if err := m.SetSchedule(s.ID, "", ""); err != nil {
-		t.Errorf("clearing a schedule should be allowed on free: %v", err)
-	}
-	// Pro can schedule.
-	m.SetEntitlement(func() bool { return true })
+	// Setting a daily restart/backup schedule is free for everyone.
 	if err := m.SetSchedule(s.ID, "03:00", "02:00"); err != nil {
-		t.Errorf("Pro should be able to schedule: %v", err)
+		t.Errorf("scheduling should be free, got %v", err)
+	}
+	// Clearing a schedule is allowed too.
+	if err := m.SetSchedule(s.ID, "", ""); err != nil {
+		t.Errorf("clearing a schedule should be allowed: %v", err)
 	}
 }
 
-func TestBackupCopiesOffsiteOnlyWhenProAndConfigured(t *testing.T) {
+func TestBackupCopiesOffsiteWhenConfigured(t *testing.T) {
 	reg := testRegistry(t)
 	rt := &fakeRuntime{exportData: []byte("ARCHIVE-BYTES")}
 	dataDir := t.TempDir()
@@ -568,21 +551,11 @@ func TestBackupCopiesOffsiteOnlyWhenProAndConfigured(t *testing.T) {
 	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "S", Port: 25565})
 	ctx := context.Background()
 
-	// Free tier: a backup is created but NOT copied off-site.
-	m.SetEntitlement(func() bool { return false })
+	// Off-site backups are free: whenever a folder is configured, the archive is
+	// copied there — no entitlement required.
 	file, err := m.Backup(ctx, s.ID)
 	if err != nil {
-		t.Fatalf("free backup: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(dest, file)); err == nil {
-		t.Error("free tier must not copy backups off-site")
-	}
-
-	// Pro tier: the archive is copied to the off-site folder.
-	m.SetEntitlement(func() bool { return true })
-	file, err = m.Backup(ctx, s.ID)
-	if err != nil {
-		t.Fatalf("pro backup: %v", err)
+		t.Fatalf("backup: %v", err)
 	}
 	got, err := os.ReadFile(filepath.Join(dest, file))
 	if err != nil {

@@ -15,7 +15,7 @@ function Shell({ children }: { children: ReactNode }) {
         <h2 className="text-sm font-semibold text-amber-100">Set up Docker to start hosting</h2>
       </div>
       <p className="mt-2 text-sm text-amber-200/80">
-        GameHost runs each game server in its own container. A few one-time steps and you're ready —
+        GameNest runs each game server in its own container. A few one-time steps and you're ready —
         we'll do the work, just approve the Windows prompts.
       </p>
       {children}

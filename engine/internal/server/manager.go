@@ -133,49 +133,8 @@ type Manager struct {
 	offsite *offsite.Store
 	items   map[string]*Server
 
-	// isPro reports whether the Pro tier is active; nil means unlimited (no
-	// gating), so the engine is fully functional until a license check is wired.
-	isPro func() bool
-
 	pullMu sync.Mutex
 	pulls  map[string]pullState // server id -> in-progress image download
-}
-
-// freeRunningLimit is how many servers may run at once on the free tier.
-const freeRunningLimit = 2
-
-// SetEntitlement wires the Pro check used to gate Pro-only features. Call once
-// at startup before serving.
-func (m *Manager) SetEntitlement(isPro func() bool) {
-	m.mu.Lock()
-	m.isPro = isPro
-	m.mu.Unlock()
-}
-
-// proEnabled reports whether Pro features are available (true when no checker is
-// wired, so tests and unlicensed-but-ungated builds stay unrestricted).
-func (m *Manager) proEnabled() bool {
-	m.mu.RLock()
-	isPro := m.isPro
-	m.mu.RUnlock()
-	return isPro == nil || isPro()
-}
-
-// runningCount returns how many of this manager's servers are currently running.
-func (m *Manager) runningCount(ctx context.Context) int {
-	m.mu.RLock()
-	names := make([]string, 0, len(m.items))
-	for _, s := range m.items {
-		names = append(names, s.ContainerName())
-	}
-	m.mu.RUnlock()
-	n := 0
-	for _, name := range names {
-		if m.rt.Inspect(ctx, name).Running {
-			n++
-		}
-	}
-	return n
 }
 
 // pullState is the live first-start image-download progress for a server.
@@ -617,13 +576,10 @@ func (m *Manager) specFor(s *Server) docker.CreateSpec {
 // since that's the list separator).
 var modSlugRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
-// SetMods sets a server's auto-installed mod list (Pro). Validates the slugs,
+// SetMods sets a server's auto-installed mod list. Validates the slugs,
 // persists them, and recreates the container (keeping the data volume) so the
 // new MODRINTH_PROJECTS takes effect; restarts it if it was running.
 func (m *Manager) SetMods(ctx context.Context, id string, mods []string) error {
-	if !m.proEnabled() {
-		return fmt.Errorf("the mod manager is a Pro feature — upgrade to enable it")
-	}
 	clean := make([]string, 0, len(mods))
 	for _, mod := range mods {
 		mod = strings.TrimSpace(mod)
@@ -669,13 +625,6 @@ func (m *Manager) Start(ctx context.Context, id string) error {
 	s, ok := m.Get(id)
 	if !ok {
 		return fmt.Errorf("server not found")
-	}
-	// Free tier caps how many servers run at once. Starting an already-running
-	// server is a no-op and never blocked.
-	if !m.proEnabled() {
-		if st := m.rt.Inspect(ctx, s.ContainerName()); !st.Running && m.runningCount(ctx) >= freeRunningLimit {
-			return fmt.Errorf("the free plan runs up to %d servers at once — upgrade to Pro to run more", freeRunningLimit)
-		}
 	}
 	var err error
 	if m.rt.Inspect(ctx, s.ContainerName()).Exists {
@@ -904,10 +853,6 @@ func (m *Manager) SetSchedule(id, restartAt, backupAt string) error {
 	if !validHHMM(restartAt) || !validHHMM(backupAt) {
 		return fmt.Errorf("times must be HH:MM (24-hour) or empty")
 	}
-	// Setting (not clearing) a schedule is a Pro feature.
-	if (restartAt != "" || backupAt != "") && !m.proEnabled() {
-		return fmt.Errorf("scheduled backups and restarts are a Pro feature — upgrade to enable them")
-	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	s, ok := m.items[id]
@@ -967,9 +912,6 @@ func (m *Manager) RunScheduler(ctx context.Context) {
 }
 
 func (m *Manager) scheduledRestart(id string) {
-	if !m.proEnabled() {
-		return // schedules are Pro-only; skip if the license lapsed
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	s, ok := m.Get(id)
@@ -987,9 +929,6 @@ func (m *Manager) scheduledRestart(id string) {
 }
 
 func (m *Manager) scheduledBackup(id string) {
-	if !m.proEnabled() {
-		return // schedules are Pro-only; skip if the license lapsed
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	if _, err := m.Backup(ctx, id); err != nil {
@@ -997,7 +936,7 @@ func (m *Manager) scheduledBackup(id string) {
 	}
 }
 
-// Backup archives a server's data volume and, on Pro with an off-site folder
+// Backup archives a server's data volume and, when an off-site folder is
 // configured, copies the archive there too. Returns the backup filename.
 func (m *Manager) Backup(ctx context.Context, id string) (string, error) {
 	s, ok := m.Get(id)
@@ -1009,14 +948,14 @@ func (m *Manager) Backup(ctx context.Context, id string) (string, error) {
 	if err := m.rt.CreateBackup(ctx, s.VolumeName(), id, file); err != nil {
 		return "", err
 	}
-	m.copyOffsite(ctx, id, file) // best-effort; Pro + configured only
+	m.copyOffsite(ctx, id, file) // best-effort; only when an off-site folder is configured
 	return file, nil
 }
 
 // copyOffsite streams the just-created archive to the configured off-site
 // folder. Best-effort: a failure is logged but never fails the backup.
 func (m *Manager) copyOffsite(ctx context.Context, id, file string) {
-	if m.offsite == nil || !m.proEnabled() {
+	if m.offsite == nil {
 		return
 	}
 	dir := m.offsite.Dir()

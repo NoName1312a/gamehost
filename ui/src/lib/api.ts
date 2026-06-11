@@ -1,4 +1,4 @@
-// Typed client for the GameHost engine API.
+// Typed client for the GameNest engine API.
 // In dev the engine listens on loopback; later the desktop shell injects the
 // real address.
 export const ENGINE_BASE = "http://127.0.0.1:8723";
@@ -136,7 +136,7 @@ export interface ServerSummary {
   ports: PortMapping[];
   memoryMB: number;
   cpus?: number; // CPU-core cap; 0/absent = uncapped
-  mods?: string[]; // Modrinth project slugs (Minecraft, Pro)
+  mods?: string[]; // Modrinth project slugs (Minecraft)
   dataPath: string;
   commandMethod: string;
   createdAt: string;
@@ -187,7 +187,6 @@ export interface LicenseInfo {
 
 export interface Offsite {
   dir: string;
-  pro: boolean;
 }
 
 export interface Telemetry {

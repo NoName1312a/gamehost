@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type LicenseInfo, type Offsite, type RemoteAccess, type Telemetry, type UserInfo } from "../lib/api";
+import { api, type LicenseInfo, type RemoteAccess, type Telemetry, type UserInfo } from "../lib/api";
 import { appVersion, applyUpdate, checkForUpdate, isDesktop, type UpdateInfo } from "../lib/updater";
 
 export function Settings({
@@ -27,7 +27,6 @@ export function Settings({
   const [licBusy, setLicBusy] = useState(false);
   const [licError, setLicError] = useState<string | null>(null);
 
-  const [offsite, setOffsite] = useState<Offsite | null>(null);
   const [offsiteDir, setOffsiteDir] = useState("");
   const [offBusy, setOffBusy] = useState(false);
   const [offError, setOffError] = useState<string | null>(null);
@@ -83,11 +82,8 @@ export function Settings({
     api.license().then(setLicense).catch(() => setLicense(null));
     api
       .offsite()
-      .then((o) => {
-        setOffsite(o);
-        setOffsiteDir(o.dir);
-      })
-      .catch(() => setOffsite(null));
+      .then((o) => setOffsiteDir(o.dir))
+      .catch(() => {});
     api.telemetry().then(setTelemetry).catch(() => setTelemetry(null));
     api
       .authStatus()
@@ -106,7 +102,6 @@ export function Settings({
     setOffSaved(false);
     try {
       const o = await api.setOffsite(offsiteDir.trim());
-      setOffsite(o);
       setOffsiteDir(o.dir);
       setOffSaved(true);
     } catch (e) {
@@ -339,42 +334,36 @@ export function Settings({
 
         <div className="mt-5 border-t border-zinc-800 pt-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-200">Plan</h3>
-            {license && (
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${
-                  license.pro
-                    ? "text-emerald-300 bg-emerald-400/10 ring-emerald-400/20"
-                    : "text-zinc-400 bg-zinc-400/10 ring-zinc-400/20"
-                }`}
-              >
-                {license.pro ? "Pro" : "Free"}
+            <h3 className="text-sm font-semibold text-zinc-200">Supporter</h3>
+            {license?.pro && (
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-medium text-emerald-300 bg-emerald-400/10 ring-1 ring-inset ring-emerald-400/20">
+                Supporter
               </span>
             )}
           </div>
           {license?.pro ? (
             <div className="mt-2 space-y-2">
               <p className="text-xs text-zinc-500">
-                Pro is active{license.email ? ` — ${license.email}` : ""}. Thanks for supporting GameHost!
+                Thanks for supporting GameNest{license.email ? ` — ${license.email}` : ""}! ❤
               </p>
               <button
                 onClick={removeLicense}
                 disabled={licBusy}
                 className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
               >
-                {licBusy ? "…" : "Remove license"}
+                {licBusy ? "…" : "Remove key"}
               </button>
             </div>
           ) : (
             <div className="mt-2 space-y-2">
               <p className="text-xs text-zinc-500">
-                Free runs up to 2 servers at once. Pro unlocks unlimited servers, scheduled backups &amp; restarts, and
-                off-site backups.
+                GameNest is free and open source — every feature is unlocked. A hosted version is coming. Have a
+                supporter or hosted key? Redeem it here.
               </p>
               <input
                 value={licKey}
                 onChange={(e) => setLicKey(e.target.value)}
-                placeholder="Paste your license key"
+                placeholder="Paste your key"
                 className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100 outline-none focus:border-emerald-500"
               />
               <button
@@ -382,7 +371,7 @@ export function Settings({
                 disabled={licBusy || !licKey.trim()}
                 className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
               >
-                {licBusy ? "Activating…" : "Activate Pro"}
+                {licBusy ? "Redeeming…" : "Redeem key"}
               </button>
             </div>
           )}
@@ -390,17 +379,9 @@ export function Settings({
         </div>
 
         <div className="mt-5 border-t border-zinc-800 pt-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-200">Off-site backups</h3>
-            {offsite && !offsite.pro && (
-              <span className="rounded-full px-2 py-0.5 text-[11px] font-medium text-amber-300 bg-amber-400/10 ring-1 ring-inset ring-amber-400/20">
-                Pro
-              </span>
-            )}
-          </div>
+          <h3 className="text-sm font-semibold text-zinc-200">Off-site backups</h3>
           <p className="mt-1 text-xs text-zinc-500">
             Also copy each backup to a folder — a NAS, external drive, or a synced cloud folder (OneDrive/Dropbox).
-            {offsite && !offsite.pro ? " Requires Pro to run." : ""}
           </p>
           <div className="mt-2 flex gap-2">
             <input
@@ -427,7 +408,7 @@ export function Settings({
         <div className="mt-5 border-t border-zinc-800 pt-4">
           <h3 className="text-sm font-semibold text-zinc-200">Diagnostics</h3>
           <p className="mt-1 text-xs text-zinc-500">
-            Help improve GameHost by sharing anonymous crash reports and basic usage (app version, OS).
+            Help improve GameNest by sharing anonymous crash reports and basic usage (app version, OS).
             Off by default, never includes personal data, and you can turn it off anytime.
           </p>
           {telemetry === null ? (

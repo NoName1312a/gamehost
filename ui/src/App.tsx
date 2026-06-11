@@ -99,7 +99,7 @@ function Header({ version, onSettings }: { version?: string; onSettings: () => v
           G
         </div>
         <div>
-          <h1 className="text-base font-semibold leading-none text-zinc-100">GameHost</h1>
+          <h1 className="text-base font-semibold leading-none text-zinc-100">GameNest</h1>
           <p className="mt-0.5 text-xs text-zinc-500">Self-host game servers, simply</p>
         </div>
       </div>
@@ -371,7 +371,7 @@ export default function App() {
       {updateInfo && (
         <div className="mx-6 mt-6 flex items-center justify-between gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3">
           <p className="text-sm text-sky-200">
-            GameHost <span className="font-semibold">v{updateInfo.version}</span> is available.
+            GameNest <span className="font-semibold">v{updateInfo.version}</span> is available.
           </p>
           <button
             onClick={() => setShowSettings(true)}
@@ -514,7 +514,7 @@ function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-lg font-black text-zinc-950">
             G
           </div>
-          <h1 className="text-base font-semibold text-zinc-100">Sign in to GameHost</h1>
+          <h1 className="text-base font-semibold text-zinc-100">Sign in to GameNest</h1>
         </div>
         <label className="mb-1 block text-xs font-medium text-zinc-400">Password</label>
         <input
@@ -546,7 +546,7 @@ function EngineOffline({ error, onRetry }: { error: string; onRetry: () => void 
         </div>
         <h1 className="text-lg font-semibold text-zinc-100">Engine not running</h1>
         <p className="mt-2 text-sm text-zinc-400">
-          The control panel can't reach the GameHost engine at{" "}
+          The control panel can't reach the GameNest engine at{" "}
           <code className="rounded bg-zinc-800 px-1 py-0.5 text-zinc-300">{api.base}</code>.
         </p>
         <pre className="mt-4 overflow-x-auto rounded-md bg-zinc-950/70 p-3 text-left text-xs text-zinc-300 ring-1 ring-zinc-800">

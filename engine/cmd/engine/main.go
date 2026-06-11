@@ -74,8 +74,10 @@ func main() {
 		slog.Warn("audit log unavailable", "err", err) // non-fatal
 	}
 
+	// The desktop app is fully free & open source — no feature gating. The license
+	// store is kept only to recognize optional supporter/hosted keys (no desktop
+	// feature depends on it). See engine/internal/license.
 	licenseStore := license.NewStore(cfg.DataDir, license.EmbeddedPublicKey())
-	mgr.SetEntitlement(licenseStore.IsPro) // gate Pro-only features (server cap, schedules)
 
 	srv := &http.Server{
 		Addr: cfg.Addr,

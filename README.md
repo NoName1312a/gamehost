@@ -1,106 +1,101 @@
-# GameHost (working title)
+# GameNest
 
-Self-host game servers — **Minecraft (Java & Bedrock), Valheim, CS2, Rust and
-more** — with a clean UI and *zero* self-hosting knowledge required.
+**Host game servers for you and your friends — free, open source, and dead simple.**
 
-GameHost runs each game server in its own Docker container, driven by a small
-Go **engine** daemon and a React **control panel**. It ships first as a desktop
-app; the same engine later runs headless on a home server or VPS — no rewrite.
+GameNest is a Windows desktop app that runs **Minecraft (Java & Bedrock), Valheim,
+CS2, Rust and more** in one click. It solves the part everyone gets stuck on —
+*"my friends can't connect"* — with automatic **UPnP port-forwarding** and a
+**relay fallback** for tricky routers/CGNAT, so you get a shareable address without
+touching your router settings.
 
-> Status: **M1 + Windows desktop app** — create/start/stop/delete servers with a
-> live console, now packaged as a one-click Windows app (Tauri) that auto-launches
-> the engine. Lifecycle is driven via the Docker CLI for now (the Docker Go SDK is
-> mid module-split); the runtime is abstracted so the SDK can drop in later.
-> See [`docs/architecture.md`](docs/architecture.md).
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078D6)
+![Free & open source](https://img.shields.io/badge/free%20%26%20open%20source-yes-brightgreen)
+
+> **No paywalls.** Unlimited servers, scheduled backups & restarts, off-site
+> backups, and the mod manager are **all free**. A managed **hosted** version (so you
+> don't have to keep your PC on) is coming later — self-hosting stays free forever.
+
+<!-- TODO: add a 10-second demo GIF here — the "create a server → friends connect" magic moment -->
+
+## What it is
+
+GameNest runs each game server in its own **Docker** container, driven by a small
+Go **engine** daemon and a React **control panel**, wrapped in a native Tauri
+desktop window that auto-launches the engine. No terminal, no config files, no
+self-hosting knowledge required.
+
+- **One-click servers** — pick a game, name it, go. ~28 game templates.
+- **Friends can actually connect** — automatic UPnP + playit.gg relay fallback, with
+  a copy-paste connect address.
+- **Backups & schedules** — daily restart/backup times and off-site copies to a NAS,
+  external drive, or synced cloud folder.
+- **Minecraft mod manager** — paste [Modrinth](https://modrinth.com) slugs; mods
+  install automatically on next start.
+- **Runs locally & private** — the engine binds to `127.0.0.1`; your data stays on
+  your machine.
+
+## Install
+
+Download the latest one-click installer from the
+[**Releases**](https://github.com/NoName1312a/gamehost/releases) page and run it.
+The app guides you through a one-time Docker setup on first launch.
+
+> The installer auto-updates from the public update feed on launch and from
+> **Settings → Check for updates**.
+
+## Build from source
+
+**Prereqs:** Go 1.22+, Node 20+. Docker Desktop is only needed once you actually run
+a game server.
+
+```bash
+# Engine — REST + WebSocket API on http://127.0.0.1:8723
+go -C engine run ./cmd/engine
+
+# UI — http://localhost:5173
+npm --prefix ui install   # first run only
+npm --prefix ui run dev
+```
+
+Desktop app (needs [Rust](https://rustup.rs) + VS 2022 C++ Build Tools):
+
+```powershell
+# Dev — hot-reload window + engine sidecar:
+powershell -ExecutionPolicy Bypass -File scripts\desktop-dev.ps1
+# Build the installer:
+powershell -ExecutionPolicy Bypass -File scripts\desktop-build.ps1
+```
+
+See [`docs/architecture.md`](docs/architecture.md) for the design.
 
 ## Repo layout
+
 ```
 engine/      Go daemon — Docker control, REST + WebSocket API
 ui/          React + Vite + Tailwind control panel
 desktop/     Tauri v2 shell (Windows) — bundles + launches the engine
 templates/   Game definitions (one YAML per game)
+ee/          Reserved for future commercial features (separate license; empty today)
 docs/        Design docs
 ```
 
-## Quick start (dev)
+## Community & contributing
 
-**Prereqs:** Go 1.22+, Node 20+. Docker Desktop is only needed once you actually
-run a game server — the panel runs fine without it and shows a setup step.
+Contributions, bug reports, and new game templates are welcome — see
+[`CONTRIBUTING.md`](CONTRIBUTING.md). Questions and help: **join the Discord**
+(link coming with the public launch). Found a security issue? See
+[`SECURITY.md`](SECURITY.md).
 
-**One command (Windows):** `powershell -ExecutionPolicy Bypass -File scripts\dev.ps1`
-opens the engine and UI in two windows. Or run them manually:
+## License
 
-### 1. Engine
-```bash
-cd engine
-go mod tidy        # fetch deps (first run only)
-go run ./cmd/engine
-# → engine listening on http://127.0.0.1:8723
-```
-> Just installed Go? Open a fresh terminal so `go` is on your PATH.
+GameNest is **open core**:
 
-### 2. UI
-```bash
-cd ui
-npm install        # first run only
-npm run dev
-# → http://localhost:5173
-```
+- The application is licensed under the **GNU AGPL v3.0** — see [`LICENSE`](LICENSE).
+  You can self-host, modify, and share it freely.
+- The [`ee/`](ee/) directory is reserved for future **commercial** features (the
+  hosted/cloud and team tiers) under a separate license — it's empty today, and the
+  desktop app is, and will remain, fully free and open source.
 
-Open the UI. With no Docker yet you'll see the **setup banner** — that's the
-expected non-technical-user path; server creation arrives in M1.
-
-## Desktop app (Windows)
-The desktop shell wraps the UI in a native window and **auto-launches the engine**
-as a bundled sidecar — no terminal, no separate engine/UI startup.
-
-**One-time prereqs:** [Rust](https://rustup.rs) (MSVC toolchain), the
-**VS 2022 C++ Build Tools** (`winget install -e --id Microsoft.VisualStudio.2022.BuildTools
---override "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"`),
-plus Go and Node. WebView2 ships with Windows 10/11.
-
-```powershell
-# Dev — hot-reload window + engine sidecar:
-powershell -ExecutionPolicy Bypass -File scripts\desktop-dev.ps1
-
-# Build the installer:
-powershell -ExecutionPolicy Bypass -File scripts\desktop-build.ps1
-# → desktop\target\release\bundle\nsis\GameHost_<version>_x64-setup.exe
-```
-
-> Docker is still required to actually run game servers — the in-app **setup
-> wizard** (below) guides that. **Auto-updates:** the app checks the public
-> [`gamehost-releases`](https://github.com/NoName1312a/gamehost-releases) feed on
-> launch and from **Settings → Check for updates**, installing signed updates in
-> one click.
-
-### Publishing a release (maintainer)
-Requires the updater signing key at `%USERPROFILE%\.tauri\gamehost-updater.key`
-(never committed) and `gh` authenticated. Bump `version` in
-`desktop/tauri.conf.json`, then:
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\release.ps1 -Version <x.y.z>
-```
-This builds the **signed** installer + `latest.json` and publishes them to the
-`gamehost-releases` repo; installed apps then auto-update.
-
-## Enabling Docker (to run game servers)
-**In the desktop app this is one-click:** when Docker isn't ready, GameHost shows
-a guided **setup wizard** that detects what's missing (WSL2 → Docker Desktop →
-start Docker) and fixes each step for you via a Windows prompt — no terminal.
-
-Prefer to do it by hand? Windows, in an **Administrator** PowerShell:
-```powershell
-wsl --install                                  # reboot if prompted
-winget install -e --id Docker.DockerDesktop
-```
-Launch Docker Desktop once after install, then restart the engine.
-
-## Roadmap
-- [x] **M0** Scaffold; UI ↔ engine; Docker probe + setup surface
-- [x] **M1** Create/start/stop/delete servers; live WebSocket console; per-server CPU/RAM limits
-- [ ] **M2** Expand the game library (more templates); first-run image-pull progress
-- [ ] **M3** Files, backups, schedules, settings
-- [ ] **M4** Networking: UPnP auto-forward + relay fallback
-- [~] **M4** Networking: automatic **UPnP** port-forward + sharable connect address ✅; **playit.gg relay** fallback for UPnP-off/CGNAT (guided setup) ✅; self-hosted relay still open
-- [~] **M5** Tauri desktop packaging (Windows ✅) + **in-app auto-updater** ✅; headless server build still open
+*GameNest is a trademark of its authors; the AGPL/commercial licenses do not grant
+trademark rights.*

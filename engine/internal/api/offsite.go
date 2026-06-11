@@ -2,14 +2,9 @@ package api
 
 import "net/http"
 
-// offsiteStatus reports the configured off-site backup folder and whether Pro
-// (required for the copy to actually run) is active.
+// offsiteStatus reports the configured off-site backup folder.
 func (a *API) offsiteStatus(w http.ResponseWriter, r *http.Request) {
-	pro := false
-	if a.license != nil {
-		pro = a.license.IsPro()
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"dir": a.mgr.OffsiteDir(), "pro": pro})
+	writeJSON(w, http.StatusOK, map[string]any{"dir": a.mgr.OffsiteDir()})
 }
 
 // setOffsite sets (or clears) the off-site backup folder.

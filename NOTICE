@@ -1,0 +1,25 @@
+GameNest
+Copyright (C) 2026 The GameNest Authors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. See the LICENSE file for the full text.
+
+  EXCEPTION — the "ee/" directory:
+  The contents of the top-level "ee/" directory are NOT covered by the AGPL.
+  They are licensed separately under the GameNest Commercial License; see
+  ee/LICENSE. (The directory is reserved for future commercial features such as
+  the hosted/cloud and team tiers; the desktop application is, and remains,
+  fully free and open source.)
+
+This product bundles and/or depends on third-party open-source software, each
+under its own license. Notably:
+  - The Go engine depends on go-chi/chi and gorilla/websocket (MIT).
+  - The UI depends on React, Vite, Tailwind CSS and others (MIT, see ui/).
+  - The desktop shell uses Tauri (MIT / Apache-2.0).
+  - Game servers run inside third-party container images (e.g. itzg/minecraft-server),
+    each under its own license, downloaded at runtime — not redistributed here.
+
+The full text of dependency licenses is available in each dependency's source
+(Go module cache, ui/node_modules) and is reproduced in distributed builds.

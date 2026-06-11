@@ -233,7 +233,7 @@ function ConnectionPanel({ s, relay, onChanged }: { s: ServerSummary; relay?: Re
   const addr = conn?.externalAddress ?? s.externalAddress;
   const forwarded = conn?.forwarded ?? s.shared;
   // A successful reachability test is the source of truth: the port can be open
-  // at the router (manual forward) even when GameHost's own UPnP mapping failed.
+  // at the router (manual forward) even when GameNest's own UPnP mapping failed.
   const reachableConfirmed = !!(test && test.checked && test.open);
   const directOK = (forwarded || reachableConfirmed) && !!addr;
 
@@ -526,7 +526,6 @@ function ModsPanel({ s, onChanged }: { s: ServerSummary; onChanged: () => void }
         </a>{" "}
         project slug per line (e.g. <span className="font-mono text-zinc-300">sodium</span>,{" "}
         <span className="font-mono text-zinc-300">fabric-api</span>). They're installed automatically on the next start.
-        Pro feature.
       </p>
       <textarea
         value={text}

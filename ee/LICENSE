@@ -1,0 +1,48 @@
+GameNest Commercial License
+Copyright (C) 2026 The GameNest Authors. All rights reserved.
+
+IMPORTANT: This license applies ONLY to the contents of this "ee/" directory.
+The rest of the GameNest repository is licensed under the GNU Affero General
+Public License v3.0 (see ../LICENSE). This directory is currently empty of code;
+this file establishes the licensing boundary for future commercial features.
+
+1. Definitions.
+   "Software" means the source code, object code, and related materials contained
+   in this "ee/" directory. "Licensor" means The GameNest Authors. "You" means the
+   individual or entity exercising rights under this License.
+
+2. Grant.
+   The Software is made source-available for transparency, review, and
+   contribution ONLY. Licensor grants You a non-exclusive, non-transferable right
+   to view and modify the Software, and to run it solely for development, testing,
+   and evaluation purposes. No right to use the Software in production, to provide
+   it as a hosted or managed service, or to distribute it, is granted by this
+   License.
+
+3. Commercial use requires an agreement.
+   Any use of the Software beyond Section 2 — including production use, internal
+   business use, offering it (modified or not) to third parties as a service, or
+   redistribution — requires a separate, valid commercial agreement or subscription
+   with Licensor. Contact the address below to obtain one.
+
+4. Restrictions.
+   You may not remove or alter any license, copyright, or attribution notices.
+   You may not sublicense, sell, or transfer the Software except as expressly
+   permitted by a commercial agreement with Licensor.
+
+5. Contributions.
+   Contributions to this directory are governed by the project's CONTRIBUTING
+   terms (see ../CONTRIBUTING.md), under which contributors grant Licensor the
+   right to license their contributions under both the AGPL-3.0 and this License.
+
+6. No warranty.
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL
+   LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM,
+   OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+Contact: licensing@gamenest.example  (replace with a real address before launch)
+
+NOTE: This is a template and not legal advice. Have it reviewed by a lawyer and
+fill in the real legal entity name and contact details before relying on it.
