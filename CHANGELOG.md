@@ -9,6 +9,11 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-11
+
+### Fixed
+- The Settings dialog now scrolls within itself on shorter windows, instead of scrolling the dashboard behind it. The background no longer moves while Settings is open.
+
 ## [0.4.0] - 2026-06-11
 
 ### Changed

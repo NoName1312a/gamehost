@@ -76,6 +76,16 @@ export function Settings({
     }
   }
 
+  // Lock background scrolling while the modal is open, so the wheel scrolls the
+  // dialog instead of the page behind it.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
   useEffect(() => {
     appVersion().then(setAppVer).catch(() => setAppVer(null));
     api.remoteAccess().then(setRemote).catch(() => setRemote(null));
@@ -232,7 +242,7 @@ export function Settings({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-6" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-6"
+        className="max-h-[calc(100vh-3rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-zinc-800 bg-zinc-900 p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
