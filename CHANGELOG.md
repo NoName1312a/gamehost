@@ -9,6 +9,11 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-06-14
+
+### Changed
+- Reworked **Add a server**: the full-page wall of game cover art is gone. A **"+ New server"** button now opens a fast, searchable game picker (type to filter, arrow keys + Enter to pick). The dashboard is much shorter and focused on your servers.
+
 ## [0.4.1] - 2026-06-11
 
 ### Fixed
