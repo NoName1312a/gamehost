@@ -14,7 +14,10 @@ import { groupGames, gameMetaFor, type GameGroup } from "./lib/games";
 import { ServerDetail } from "./components/ServerDetail";
 import { SetupWizard } from "./components/SetupWizard";
 import { Settings } from "./components/Settings";
-import { checkForUpdate, type UpdateInfo } from "./lib/updater";
+import { Menu } from "./components/Menu";
+import { Changelog } from "./components/Changelog";
+import { changelog as changelogEntries, entriesSince, type ChangelogEntry } from "./lib/changelog";
+import { appVersion, checkForUpdate, type UpdateInfo } from "./lib/updater";
 
 // ---- tiny async helper -----------------------------------------------------
 
@@ -81,32 +84,25 @@ function statusStyle(status: string): string {
 
 // ---- sections --------------------------------------------------------------
 
-function Header({ version, onSettings }: { version?: string; onSettings: () => void }) {
+function Header({ onMenu }: { onMenu: () => void }) {
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-zinc-800/80 bg-zinc-950/80 px-6 py-3.5 backdrop-blur">
-      <div className="flex items-center gap-3">
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-lg font-black text-zinc-950 shadow-lg shadow-emerald-500/20">
-          G
-        </div>
-        <div>
-          <h1 className="text-base font-semibold leading-none text-zinc-100">GameNest</h1>
-          <p className="mt-0.5 text-xs text-zinc-500">Self-host game servers, simply</p>
-        </div>
+    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-zinc-800/80 bg-zinc-950/80 px-4 py-3.5 backdrop-blur sm:px-6">
+      <button
+        onClick={onMenu}
+        title="Menu"
+        aria-label="Open menu"
+        className="grid h-9 w-9 place-items-center rounded-xl text-zinc-300 ring-1 ring-inset ring-zinc-800 transition hover:bg-zinc-800/60 hover:text-zinc-100"
+      >
+        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-lg font-black text-zinc-950 shadow-lg shadow-emerald-500/20">
+        G
       </div>
-      <div className="flex items-center gap-2">
-        {version && (
-          <span className="rounded-full bg-zinc-800/80 px-2.5 py-1 text-xs text-zinc-400 ring-1 ring-inset ring-zinc-700/60">
-            engine {version}
-          </span>
-        )}
-        <button
-          onClick={onSettings}
-          title="Settings"
-          aria-label="Settings"
-          className="grid h-9 w-9 place-items-center rounded-xl text-lg leading-none text-zinc-400 ring-1 ring-inset ring-zinc-800 transition hover:bg-zinc-800/60 hover:text-zinc-200"
-        >
-          ⚙
-        </button>
+      <div>
+        <h1 className="text-base font-semibold leading-none text-zinc-100">GameNest</h1>
+        <p className="mt-0.5 text-xs text-zinc-500">Self-host game servers, simply</p>
       </div>
     </header>
   );
@@ -245,6 +241,9 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [appVer, setAppVer] = useState<string | null>(null);
+  const [whatsNew, setWhatsNew] = useState<{ title: string; subtitle?: string; entries: ChangelogEntry[] } | null>(null);
 
   // Auth gate: loopback (desktop) is always authenticated, so this only ever
   // shows a login for remote browsers. null = unknown (don't gate yet).
@@ -263,6 +262,31 @@ export default function App() {
   useEffect(() => {
     checkForUpdate()
       .then(setUpdateInfo)
+      .catch(() => {});
+  }, []);
+
+  // After an update, pop "What's New" scoped to what changed since the version
+  // the user last ran. First run (no stored version) and unchanged launches stay
+  // silent. No-op in a browser (appVersion() is null there).
+  useEffect(() => {
+    appVersion()
+      .then((v) => {
+        setAppVer(v);
+        if (!v) return;
+        const KEY = "gamenest.lastSeenVersion";
+        const last = localStorage.getItem(KEY);
+        if (last && last !== v) {
+          const since = entriesSince(last);
+          if (since.length > 0) {
+            setWhatsNew({
+              title: `Updated to v${v} 🎉`,
+              subtitle: `Here's what's new since v${last}.`,
+              entries: since,
+            });
+          }
+        }
+        localStorage.setItem(KEY, v);
+      })
       .catch(() => {});
   }, []);
 
@@ -307,7 +331,7 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-screen max-w-6xl">
-      <Header version={version} onSettings={() => setShowSettings(true)} />
+      <Header onMenu={() => setMenuOpen(true)} />
       {updateInfo && (
         <div className="mx-6 mt-6 flex items-center justify-between gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3">
           <p className="text-sm text-sky-200">
@@ -425,6 +449,29 @@ export default function App() {
           engineVersion={version}
           initialUpdate={updateInfo}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+      {menuOpen && (
+        <Menu
+          appVersion={appVer}
+          engineVersion={version}
+          onSettings={() => {
+            setMenuOpen(false);
+            setShowSettings(true);
+          }}
+          onWhatsNew={() => {
+            setMenuOpen(false);
+            setWhatsNew({ title: "What's New", entries: changelogEntries });
+          }}
+          onClose={() => setMenuOpen(false)}
+        />
+      )}
+      {whatsNew && (
+        <Changelog
+          title={whatsNew.title}
+          subtitle={whatsNew.subtitle}
+          entries={whatsNew.entries}
+          onClose={() => setWhatsNew(null)}
         />
       )}
 

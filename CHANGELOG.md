@@ -9,6 +9,13 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-06-14
+
+### Added
+- A **menu drawer** (the ☰ button, top-left) that gathers navigation in one place: Settings, What's New, and GitHub / Discord links.
+- A **What's New** viewer — browse the full version history with what changed in each release, any time, from the menu.
+- After an app update, a **What's New popup** automatically highlights what changed since the version you were last on.
+
 ## [0.4.2] - 2026-06-14
 
 ### Changed
