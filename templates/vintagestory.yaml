@@ -4,7 +4,8 @@ game: vintagestory
 category: Survival
 description: >-
   Wilderness survival sandbox with deep crafting and exploration. Dedicated
-  server (devidian).
+  server (devidian). Server settings live in serverconfig.json — edit it in the
+  file manager.
 icon: vintagestory
 image: devidian/vintagestory:latest
 runtime: native

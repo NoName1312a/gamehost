@@ -9,6 +9,17 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-06-14
+
+### Added
+- Configurable settings (server name, password, admin password, max players) in the create-server form for **Mordhau**, **Conan Exiles**, **Squad**, and **Insurgency: Sandstorm**.
+
+### Fixed
+- The live console no longer leaks a background log-streaming process when you close it — its lifetime is now bounded and cleaned up reliably.
+
+### Changed
+- Games configured via files (Veloren, OpenTTD, Vintage Story, Unturned) now say so in their description and point you to the file manager, instead of looking like they have no settings.
+
 ## [0.4.5] - 2026-06-14
 
 ### Changed

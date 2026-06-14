@@ -4,7 +4,8 @@ game: veloren
 category: Survival
 description: >-
   Open-source voxel multiplayer action-RPG. Dedicated server; world generation on
-  first boot uses some CPU/RAM.
+  first boot uses some CPU/RAM. Server settings live in settings.ron — edit it in
+  the file manager.
 icon: veloren
 image: florianpiesche/veloren-server:latest
 runtime: native

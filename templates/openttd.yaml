@@ -4,7 +4,8 @@ game: openttd
 category: Simulation
 description: >-
   Open-source Transport Tycoon Deluxe — build road, rail, air and sea networks.
-  Multiplayer dedicated server.
+  Multiplayer dedicated server. Server name, password and limits live in
+  openttd.cfg — edit it in the file manager.
 icon: openttd
 steamAppId: 1536610
 image: redditopenttd/openttd:latest

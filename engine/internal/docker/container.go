@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
@@ -147,21 +148,44 @@ func (r *Runtime) Inspect(ctx context.Context, name string) State {
 }
 
 // LogsReader starts `docker logs -f` and returns a reader over its combined
-// stdout/stderr. Cancel ctx to stop streaming and kill the process.
+// stdout/stderr. Either cancel ctx or Close the reader to stop streaming and
+// kill the process — both are safe and idempotent.
 func (r *Runtime) LogsReader(ctx context.Context, name string, tail int) (io.ReadCloser, error) {
+	// Derive our own cancel so Close() can kill the process directly, instead of
+	// relying on the caller threading this exact ctx into the kill path. Without
+	// it, closing the reader alone would stop draining stdout, `docker logs -f`
+	// would block on a full pipe and never exit, and cmd.Wait would leak.
+	cctx, cancel := context.WithCancel(ctx)
 	pr, pw := io.Pipe()
-	cmd := exec.CommandContext(ctx, "docker", "logs", "-f", "--tail", fmt.Sprintf("%d", tail), name)
+	cmd := exec.CommandContext(cctx, "docker", "logs", "-f", "--tail", fmt.Sprintf("%d", tail), name)
 	cmd.Stdout = pw
 	cmd.Stderr = pw
 	if err := cmd.Start(); err != nil {
+		cancel()
 		_ = pw.Close()
 		return nil, err
 	}
 	go func() {
 		_ = cmd.Wait()
-		_ = pw.Close()
+		_ = pw.Close() // unblock the reader once the process is gone
 	}()
-	return pr, nil
+	return &logsReadCloser{pr: pr, cancel: cancel}, nil
+}
+
+// logsReadCloser wraps the logs pipe so Close() both kills the `docker logs`
+// process (via cancel) and unblocks the reader (via the pipe). Close is
+// idempotent.
+type logsReadCloser struct {
+	pr     *io.PipeReader
+	cancel context.CancelFunc
+	once   sync.Once
+}
+
+func (l *logsReadCloser) Read(p []byte) (int, error) { return l.pr.Read(p) }
+
+func (l *logsReadCloser) Close() error {
+	l.once.Do(l.cancel)
+	return l.pr.Close()
 }
 
 func sortedKeys(m map[string]string) []string {

@@ -28,4 +28,27 @@ ports:
     protocol: udp
     default: 15000
 env: {}
-variables: []
+variables:
+  - key: SERVER_NAME
+    label: Server Name
+    description: Name shown in the in-game server browser.
+    default: GameNest Mordhau
+    type: string
+    required: true
+  - key: SERVER_PW
+    label: Password
+    description: Join password. Leave empty for a public server.
+    default: ""
+    type: string
+    required: false
+  - key: SERVER_ADMINPW
+    label: Admin Password
+    description: Admin password for in-game admin commands.
+    default: ""
+    type: string
+    required: false
+  - key: SERVER_MAXPLAYERS
+    label: Max Players
+    default: "32"
+    type: int
+    required: false

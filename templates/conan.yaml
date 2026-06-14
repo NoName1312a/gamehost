@@ -28,4 +28,27 @@ ports:
     protocol: udp
     default: 27015
 env: {}
-variables: []
+variables:
+  - key: SERVER_NAME
+    label: Server Name
+    description: Name shown in the server browser.
+    default: GameNest Conan
+    type: string
+    required: true
+  - key: SERVER_PASSWORD
+    label: Password
+    description: Join password. Leave empty for a public server.
+    default: ""
+    type: string
+    required: false
+  - key: ADMIN_PASSWORD
+    label: Admin Password
+    description: Server admin password.
+    default: ""
+    type: string
+    required: false
+  - key: MAX_PLAYERS
+    label: Max Players
+    default: "40"
+    type: int
+    required: false

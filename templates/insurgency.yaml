@@ -23,4 +23,10 @@ ports:
     protocol: udp
     default: 27131
 env: {}
-variables: []
+variables:
+  - key: HOSTNAME
+    label: Server Name
+    description: Name shown in the server browser. Map, mode and other launch options are set via LAUNCH_SERVER_ENV (advanced).
+    default: GameNest Insurgency
+    type: string
+    required: true

@@ -4,6 +4,8 @@ game: unturned
 category: Survival
 description: >-
   Free blocky zombie-survival sandbox shooter. 64-bit Linux dedicated server.
+  Server name, password and players are set in the config files — edit them in
+  the file manager.
 icon: unturned
 steamAppId: 304930
 image: imperialplugins/unturned:latest
