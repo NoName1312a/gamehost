@@ -18,6 +18,7 @@ import { Menu } from "./components/Menu";
 import { Changelog } from "./components/Changelog";
 import { changelog as changelogEntries, entriesSince, type ChangelogEntry } from "./lib/changelog";
 import { appVersion, checkForUpdate, type UpdateInfo } from "./lib/updater";
+import { friendlyError } from "./lib/errors";
 
 // ---- tiny async helper -----------------------------------------------------
 
@@ -35,7 +36,7 @@ function useAsync<T>(fn: () => Promise<T>, nonce = 0): Async<T> {
     fn()
       .then((data) => alive && setState({ status: "ok", data }))
       .catch((e: unknown) =>
-        alive && setState({ status: "error", error: e instanceof Error ? e.message : String(e) }),
+        alive && setState({ status: "error", error: friendlyError(e) }),
       );
     return () => {
       alive = false;
@@ -296,7 +297,7 @@ export default function App() {
     try {
       await fn();
     } catch (e) {
-      setToast(e instanceof Error ? e.message : String(e));
+      setToast(friendlyError(e));
     } finally {
       setBusy((b) => {
         const next = { ...b };
@@ -500,7 +501,7 @@ function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
       await api.login(pw);
       onLoggedIn();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(friendlyError(e));
       setBusy(false);
     }
   }

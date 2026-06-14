@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { api, type CreateServerRequest, type Template } from "../lib/api";
 import { editionLabel, type GameGroup } from "../lib/games";
+import { friendlyError } from "../lib/errors";
 
 const field =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-emerald-500";
@@ -78,7 +79,7 @@ function OptionsForm({
       await api.createServer(req);
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(friendlyError(err));
       setSubmitting(false);
     }
   }

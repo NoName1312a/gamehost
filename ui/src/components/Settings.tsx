@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type LicenseInfo, type RemoteAccess, type Telemetry, type UserInfo } from "../lib/api";
 import { appVersion, applyUpdate, checkForUpdate, isDesktop, type UpdateInfo } from "../lib/updater";
+import { friendlyError } from "../lib/errors";
 
 export function Settings({
   engineVersion,
@@ -60,7 +61,7 @@ export function Settings({
       setNu({ username: "", password: "", role: "operator" });
       loadUsers();
     } catch (e) {
-      setUsrError(e instanceof Error ? e.message : String(e));
+      setUsrError(friendlyError(e));
     } finally {
       setUsrBusy(false);
     }
@@ -72,7 +73,7 @@ export function Settings({
       await api.deleteUser(username);
       loadUsers();
     } catch (e) {
-      setUsrError(e instanceof Error ? e.message : String(e));
+      setUsrError(friendlyError(e));
     }
   }
 
@@ -115,7 +116,7 @@ export function Settings({
       setOffsiteDir(o.dir);
       setOffSaved(true);
     } catch (e) {
-      setOffError(e instanceof Error ? e.message : String(e));
+      setOffError(friendlyError(e));
     } finally {
       setOffBusy(false);
     }
@@ -128,7 +129,7 @@ export function Settings({
     try {
       setTelemetry(await api.setTelemetry(!telemetry.enabled));
     } catch (e) {
-      setTelError(e instanceof Error ? e.message : String(e));
+      setTelError(friendlyError(e));
     } finally {
       setTelBusy(false);
     }
@@ -144,7 +145,7 @@ export function Settings({
       const r = await api.purge();
       setPurgeMsg(`Removed ${r.removed} server${r.removed === 1 ? "" : "s"}. Close settings to refresh.`);
     } catch (e) {
-      setPurgeMsg(e instanceof Error ? e.message : String(e));
+      setPurgeMsg(friendlyError(e));
     } finally {
       setPurgeBusy(false);
     }
@@ -157,7 +158,7 @@ export function Settings({
       setLicense(await api.setLicense(licKey.trim()));
       setLicKey("");
     } catch (e) {
-      setLicError(e instanceof Error ? e.message : String(e));
+      setLicError(friendlyError(e));
     } finally {
       setLicBusy(false);
     }
@@ -169,7 +170,7 @@ export function Settings({
     try {
       setLicense(await api.clearLicense());
     } catch (e) {
-      setLicError(e instanceof Error ? e.message : String(e));
+      setLicError(friendlyError(e));
     } finally {
       setLicBusy(false);
     }
@@ -187,7 +188,7 @@ export function Settings({
       setNewPw("");
       setRemote(await api.remoteAccess());
     } catch (e) {
-      setRaError(e instanceof Error ? e.message : String(e));
+      setRaError(friendlyError(e));
     } finally {
       setRaBusy(false);
     }
@@ -200,7 +201,7 @@ export function Settings({
     try {
       setRemote(await api.setRemoteAccess(!remote.enabled));
     } catch (e) {
-      setRaError(e instanceof Error ? e.message : String(e));
+      setRaError(friendlyError(e));
     } finally {
       setRaBusy(false);
     }
@@ -221,7 +222,7 @@ export function Settings({
       setUpdate(u);
       setStatus(u ? null : "You're on the latest version.");
     } catch (e) {
-      setStatus("Couldn't check for updates: " + (e instanceof Error ? e.message : String(e)));
+      setStatus("Couldn't check for updates: " + (friendlyError(e)));
     } finally {
       setChecking(false);
     }
@@ -234,7 +235,7 @@ export function Settings({
       await applyUpdate((f) => setStatus(f != null ? `Downloading update… ${Math.round(f * 100)}%` : "Downloading update…"));
       setStatus("Installing and restarting…");
     } catch (e) {
-      setStatus("Update failed: " + (e instanceof Error ? e.message : String(e)));
+      setStatus("Update failed: " + (friendlyError(e)));
       setBusy(false);
     }
   }

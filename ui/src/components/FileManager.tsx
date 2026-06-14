@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type FileEntry, type ServerSummary } from "../lib/api";
+import { friendlyError } from "../lib/errors";
 
 function fmtSize(n: number): string {
   if (n < 1024) return n + " B";
@@ -32,7 +33,7 @@ export function FileManager({ server, onClose }: { server: ServerSummary; onClos
         setEntries(r.entries);
         setPath(p);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(friendlyError(e));
       } finally {
         setLoading(false);
       }
@@ -45,7 +46,7 @@ export function FileManager({ server, onClose }: { server: ServerSummary; onClos
   }, [load]);
 
   const join = (p: string, name: string) => (p ? p + "/" + name : name);
-  const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
+  const fail = (e: unknown) => setError(friendlyError(e));
 
   async function openFile(name: string) {
     setError(null);

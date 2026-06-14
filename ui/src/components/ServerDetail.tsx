@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { friendlyError } from "../lib/errors";
 import {
   api,
   type BackupInfo,
@@ -191,11 +192,13 @@ function ConnectionPanel({ s, relay, onChanged }: { s: ServerSummary; relay?: Re
   const [conn, setConn] = useState<Connectivity | null>(null);
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<Reachable | null>(null);
+  const autoTested = useRef(false);
 
   useEffect(() => {
     if (!s.running) {
       setConn(null);
       setTest(null);
+      autoTested.current = false;
       return;
     }
     let alive = true;
@@ -211,11 +214,24 @@ function ConnectionPanel({ s, relay, onChanged }: { s: ServerSummary; relay?: Re
     try {
       setTest(await api.testConnectivity(s.id));
     } catch (e) {
-      setTest({ open: false, checked: false, detail: e instanceof Error ? e.message : String(e) });
+      setTest({ open: false, checked: false, detail: friendlyError(e) });
     } finally {
       setTesting(false);
     }
   }
+
+  // Auto-confirm reachability once the port looks forwarded, so users don't have
+  // to click "Test connection" — and so a "forwarded but unreachable" state
+  // (CGNAT/firewall) surfaces on its own and routes them to the relay.
+  useEffect(() => {
+    if (!conn || !conn.running || autoTested.current) return;
+    if (conn.forwarded && /tcp/i.test(conn.protocol) && conn.externalAddress) {
+      autoTested.current = true;
+      runTest();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conn]);
+
   async function stopSharing() {
     try {
       await api.setRelayAddress(s.id, "");
@@ -236,6 +252,10 @@ function ConnectionPanel({ s, relay, onChanged }: { s: ServerSummary; relay?: Re
   // at the router (manual forward) even when GameNest's own UPnP mapping failed.
   const reachableConfirmed = !!(test && test.checked && test.open);
   const directOK = (forwarded || reachableConfirmed) && !!addr;
+  // Nudge the relay when direct hosting isn't working: either the router never
+  // forwarded the port, or it did but an external test couldn't reach it.
+  const testedNotOpen = !!(test && test.checked && !test.open);
+  const suggestRelay = !s.relayAddress && !reachableConfirmed && (testedNotOpen || !forwarded);
 
   const testLine = test ? (
     <p
@@ -310,14 +330,23 @@ function ConnectionPanel({ s, relay, onChanged }: { s: ServerSummary; relay?: Re
             </button>
           </div>
         ) : (
-          <details>
-            <summary className="cursor-pointer text-xs text-zinc-400 hover:text-zinc-200">
-              No router access? Share via a relay instead →
-            </summary>
-            <div className="mt-2">
-              <RelaySetup s={s} relay={relay} port={port} proto={proto} onChanged={onChanged} />
-            </div>
-          </details>
+          <>
+            {suggestRelay && (
+              <p className="mb-2 text-xs text-amber-300">
+                {testedNotOpen
+                  ? "Friends couldn't reach the port. If the server has finished starting, your ISP may be blocking it (CGNAT) — share via a relay below, no router setup needed."
+                  : "Your router didn't open the port automatically. Forward it manually above, or share via a relay below — no router setup needed."}
+              </p>
+            )}
+            <details open={suggestRelay}>
+              <summary className="cursor-pointer text-xs text-zinc-400 hover:text-zinc-200">
+                No router access? Share via a relay instead →
+              </summary>
+              <div className="mt-2">
+                <RelaySetup s={s} relay={relay} port={port} proto={proto} onChanged={onChanged} />
+              </div>
+            </details>
+          </>
         )}
       </div>
     </div>
@@ -353,14 +382,14 @@ function BackupsPanel({ s }: { s: ServerSummary }) {
       const r = await api.listBackups(s.id);
       setBackups(r.backups);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e));
     }
   }, [s.id]);
   useEffect(() => {
     load();
   }, [load]);
 
-  const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
+  const fail = (e: unknown) => setError(friendlyError(e));
 
   async function backup() {
     setBusy("Backing up… (this can take a while)");
@@ -459,7 +488,7 @@ function SchedulesPanel({ s, onChanged }: { s: ServerSummary; onChanged: () => v
       setTimeout(() => setSaved(false), 2500);
       onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e));
     } finally {
       setSaving(false);
     }
@@ -511,7 +540,7 @@ function ModsPanel({ s, onChanged }: { s: ServerSummary; onChanged: () => void }
       setTimeout(() => setSaved(false), 2500);
       onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e));
     } finally {
       setSaving(false);
     }

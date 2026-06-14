@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { api, type Setup, type SetupStep } from "../lib/api";
+import { friendlyError } from "../lib/errors";
 
 // Mirrors the tiny Async helper in App.tsx (kept local to avoid a shared export).
 type Async<T> =
@@ -119,7 +120,7 @@ function StepRow({
       const res = await api.runSetupStep(step.action.endpoint);
       setHint(res.hint);
     } catch (e) {
-      setHint(e instanceof Error ? e.message : String(e));
+      setHint(friendlyError(e));
     } finally {
       setPending(false);
       onRecheck();

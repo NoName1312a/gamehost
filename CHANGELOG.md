@@ -9,6 +9,12 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-06-14
+
+### Changed
+- **Friendlier error messages.** Raw Docker/engine errors are now shown as short, plain-language messages with a next step — e.g. "Docker isn't running — open Docker Desktop", "That port is already in use — pick another", "Not enough memory — lower the server's memory."
+- **Smarter "friends can connect" flow.** After your router forwards a port, GameNest now automatically checks whether friends can actually reach it (no need to click "Test"). If the router didn't forward it — or forwarded it but an ISP/firewall is still blocking it (e.g. CGNAT) — the relay option is surfaced automatically with a plain-language explanation, instead of leaving you to figure it out.
+
 ## [0.4.4] - 2026-06-14
 
 ### Security
