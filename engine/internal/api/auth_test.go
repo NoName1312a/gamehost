@@ -21,6 +21,7 @@ func req(t *testing.T, h http.Handler, method, path, remote, body string, cookie
 		r = httptest.NewRequest(method, path, strings.NewReader(body))
 	}
 	r.RemoteAddr = remote
+	r.Header.Set(csrfHeader, "1") // legit client (the UI) always sends this
 	for _, c := range cookies {
 		r.AddCookie(c)
 	}

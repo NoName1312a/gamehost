@@ -235,9 +235,14 @@ async function get<T>(path: string): Promise<T> {
 }
 
 async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
+  // X-GameNest marks this as a first-party request. The engine requires it on
+  // every mutating call as a CSRF guard — a cross-origin page can't set a custom
+  // header without a preflight that fails for non-allow-listed origins.
+  const headers: Record<string, string> = { "X-GameNest": "1" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
   const res = await fetch(`${ENGINE_BASE}${path}`, {
     method,
-    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) throw new Error(await parseError(res, path));

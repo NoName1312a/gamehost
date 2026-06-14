@@ -73,10 +73,12 @@ func NewRouter(d Deps) http.Handler {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   d.Cfg.AllowOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization", csrfHeader},
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
+	// Anti-CSRF: mutating requests must carry the csrfHeader (see csrfGuard).
+	r.Use(a.csrfGuard)
 
 	r.Route("/api", func(r chi.Router) {
 		// Record mutating actions (covers login attempts too).

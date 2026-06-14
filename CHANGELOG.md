@@ -9,6 +9,11 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-06-14
+
+### Security
+- Closed a cross-site request forgery (CSRF) hole. The engine trusts requests from your own machine, so a website you opened in a browser while GameNest was running could quietly send commands to it — including destructive ones like wiping all servers. Every state-changing request now requires a first-party header that other websites cannot send.
+
 ## [0.4.3] - 2026-06-14
 
 ### Added
