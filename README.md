@@ -38,7 +38,7 @@ self-hosting knowledge required.
 ## Install
 
 Download the latest one-click installer from the
-[**Releases**](https://github.com/NoName1312a/gamehost/releases) page and run it.
+[**Releases**](https://github.com/NoName1312a/gamehost-releases/releases/latest) page and run it.
 The app guides you through a one-time Docker setup on first launch.
 
 > The installer auto-updates from the public update feed on launch and from
