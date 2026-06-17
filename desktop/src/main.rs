@@ -55,6 +55,23 @@ fn resolve_playit() -> Option<PathBuf> {
     candidates.into_iter().find(|p| p.is_file())
 }
 
+/// Resolve the bundled frpc client for the built-in tunnel, mirroring
+/// resolve_playit: next to the app exe (installed app) or the staged binary
+/// under the crate dir (`tauri dev`). None falls back to a system/PATH frpc.
+fn resolve_frpc() -> Option<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join("frpc.exe"));
+        }
+    }
+    candidates.push(PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/binaries/frpc-x86_64-pc-windows-msvc.exe"
+    )));
+    candidates.into_iter().find(|p| p.is_file())
+}
+
 fn main() {
     tauri::Builder::default()
         // Single-instance must be the first plugin registered. A second launch
@@ -87,6 +104,12 @@ fn main() {
             // separate winget install. The engine runs it only while hosting.
             if let Some(playit) = resolve_playit() {
                 sidecar = sidecar.env("GAMEHOST_PLAYIT", playit.to_string_lossy().to_string());
+            }
+            // Point the engine at the bundled frpc for the built-in tunnel. This
+            // only locates the binary; the tunnel itself stays dormant until the
+            // engine is given a control-plane URL (GAMEHOST_TUNNEL_URL).
+            if let Some(frpc) = resolve_frpc() {
+                sidecar = sidecar.env("GAMEHOST_FRPC", frpc.to_string_lossy().to_string());
             }
             // GAMEHOST_DATA is left unset: the engine defaults to
             // %APPDATA%\gamehost\data, which is correct for a desktop install.

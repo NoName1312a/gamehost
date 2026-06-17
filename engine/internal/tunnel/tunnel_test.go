@@ -182,3 +182,25 @@ func TestReconcileBestEffortOnAllocateFailure(t *testing.T) {
 		t.Fatal("sidecar should run for the good server")
 	}
 }
+
+func TestAgentStopStopsSidecar(t *testing.T) {
+	rec := newCP()
+	srv := rec.server(t)
+	dir := t.TempDir()
+	fake := &fakeSup{}
+	a := newAgent(NewClient(srv.URL, dir), fake, dir)
+
+	if _, err := a.Reconcile(context.Background(), []Desired{{
+		Slug: "mc", Ports: []PortReq{{Role: "game", Proto: "udp"}}, LocalPorts: map[string]int{"game": 25565},
+	}}); err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	if !fake.running {
+		t.Fatal("precondition: sidecar should be running after reconcile")
+	}
+
+	a.Stop()
+	if fake.running {
+		t.Fatal("Stop should stop the frpc sidecar (so the tunnel doesn't outlive the app)")
+	}
+}

@@ -28,6 +28,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/telemetry"
 	"github.com/leop1/gamehost/engine/internal/templates"
+	"github.com/leop1/gamehost/engine/internal/tunnel"
 )
 
 func main() {
@@ -47,6 +48,14 @@ func main() {
 	netMapper := network.New()
 	relayAgent := relay.New(cfg.DataDir)
 
+	// The built-in GameNest tunnel is dormant unless a control-plane URL is set
+	// (GAMEHOST_TUNNEL_URL). When unset, no agent is created and the tunnel
+	// routes report "not configured".
+	var tunAgent *tunnel.Agent
+	if url := os.Getenv("GAMEHOST_TUNNEL_URL"); url != "" {
+		tunAgent = tunnel.New(cfg.DataDir, url)
+	}
+
 	reg := templates.NewRegistry(cfg.TemplatesDir)
 	if err := reg.Load(); err != nil {
 		// Non-fatal: the panel still boots so the user can see the setup wizard.
@@ -59,6 +68,9 @@ func main() {
 	if err != nil {
 		slog.Error("failed to initialize server manager", "err", err)
 		os.Exit(1)
+	}
+	if tunAgent != nil {
+		mgr.SetTunnel(api.AdaptTunnel(tunAgent))
 	}
 
 	authStore, err := auth.New(cfg.DataDir)
@@ -82,7 +94,7 @@ func main() {
 	srv := &http.Server{
 		Addr: cfg.Addr,
 		Handler: api.NewRouter(api.Deps{
-			Cfg: cfg, RT: rt, Reg: reg, Mgr: mgr, Net: netMapper, Relay: relayAgent,
+			Cfg: cfg, RT: rt, Reg: reg, Mgr: mgr, Net: netMapper, Relay: relayAgent, Tunnel: tunAgent,
 			Auth: authStore, Remote: remoteCtrl, Audit: auditLog, License: licenseStore,
 			Telemetry: telStore,
 		}),
@@ -143,6 +155,9 @@ func main() {
 	// Remove any UPnP port mappings so they don't linger on the router.
 	netMapper.UnmapAll(ctx)
 	relayAgent.Stop()
+	if tunAgent != nil {
+		tunAgent.Stop()
+	}
 	remoteCtrl.Shutdown(ctx)
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("graceful shutdown failed", "err", err)

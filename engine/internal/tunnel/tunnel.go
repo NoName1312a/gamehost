@@ -155,6 +155,16 @@ func (a *Agent) snapshot() map[string]Allocation {
 	return out
 }
 
+// Stop tears down the frpc sidecar — e.g. on engine shutdown — so the tunnel
+// doesn't outlive the app. Control-plane allocations are left as-is; frps drops
+// each proxy the moment frpc disconnects, and they're reclaimed on the next
+// reconcile.
+func (a *Agent) Stop() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.sup.stop()
+}
+
 // Addresses returns the public proxies for slug, or nil if not tunneled.
 func (a *Agent) Addresses(slug string) []AllocProxy {
 	a.mu.Lock()

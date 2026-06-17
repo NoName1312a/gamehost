@@ -23,6 +23,7 @@ import (
 	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/telemetry"
 	"github.com/leop1/gamehost/engine/internal/templates"
+	"github.com/leop1/gamehost/engine/internal/tunnel"
 )
 
 // Version is the engine API version, surfaced at /api/health.
@@ -31,14 +32,15 @@ const Version = "0.1.0-m1"
 // Deps bundles everything the router needs. Grouping them keeps the signature
 // stable as new subsystems (auth, remote, audit, license, …) are added.
 type Deps struct {
-	Cfg     config.Config
-	RT      *docker.Runtime
-	Reg     *templates.Registry
-	Mgr     *server.Manager
-	Net     *network.Mapper
-	Relay   *relay.Agent
-	Auth    *auth.Store
-	Remote  *remote.Controller
+	Cfg       config.Config
+	RT        *docker.Runtime
+	Reg       *templates.Registry
+	Mgr       *server.Manager
+	Net       *network.Mapper
+	Relay     *relay.Agent
+	Tunnel    *tunnel.Agent
+	Auth      *auth.Store
+	Remote    *remote.Controller
 	Audit     *audit.Logger
 	License   *license.Store
 	Telemetry *telemetry.Store
@@ -52,6 +54,7 @@ type API struct {
 	mgr          *server.Manager
 	net          *network.Mapper
 	relay        *relay.Agent
+	tunnel       *tunnel.Agent
 	auth         *auth.Store
 	remote       *remote.Controller
 	audit        *audit.Logger
@@ -63,7 +66,7 @@ type API struct {
 // NewRouter wires up the HTTP routes and middleware. It also hands the assembled
 // handler to the remote controller so the remote listener serves the same API.
 func NewRouter(d Deps) http.Handler {
-	a := &API{cfg: d.Cfg, rt: d.RT, reg: d.Reg, mgr: d.Mgr, net: d.Net, relay: d.Relay,
+	a := &API{cfg: d.Cfg, rt: d.RT, reg: d.Reg, mgr: d.Mgr, net: d.Net, relay: d.Relay, tunnel: d.Tunnel,
 		auth: d.Auth, remote: d.Remote, audit: d.Audit, license: d.License, telemetry: d.Telemetry,
 		loginLimiter: newLoginLimiter(5, 5*time.Minute)}
 
@@ -118,6 +121,7 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/system/relay", a.relayStatus)
 			r.Post("/system/relay/link", a.relayLink)
 			r.Post("/system/relay/{action}", a.relayAction)
+			r.Get("/system/tunnel", a.tunnelStatus)
 
 			r.Get("/templates", a.listTemplates)
 			r.Get("/templates/{id}", a.getTemplate)
@@ -126,6 +130,7 @@ func NewRouter(d Deps) http.Handler {
 			r.Post("/servers", a.createServer)
 			r.Patch("/servers/{id}", a.updateServer)
 			r.Put("/servers/{id}/relay-address", a.setRelayAddress)
+			r.Put("/servers/{id}/use-tunnel", a.setUseTunnel)
 			r.Get("/servers/{id}/connectivity", a.connectivity)
 			r.Post("/servers/{id}/connectivity/test", a.connectivityTest)
 			r.Get("/servers/{id}/files", a.listFiles)

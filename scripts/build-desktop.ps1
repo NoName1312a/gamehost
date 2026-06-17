@@ -43,6 +43,25 @@ if (-not (Test-Path $playitCache)) {
 Copy-Item $playitCache (Join-Path $binDir "playit-$triple.exe") -Force
 Write-Host "Staged sidecar: desktop\binaries\playit-$triple.exe" -ForegroundColor Green
 
+# Bundle the frp client (frpc) as a sidecar for the built-in GameNest tunnel
+# (the "Share with friends" feature). The engine runs it on demand — only while a
+# tunnel-shared server is hosting — via the GAMEHOST_FRPC path the shell passes
+# in. Cached by version; frpc.exe is extracted from the official release zip.
+$frpVer = "0.69.1"
+$frpUrl = "https://github.com/fatedier/frp/releases/download/v$frpVer/frp_${frpVer}_windows_amd64.zip"
+$frpcCache = Join-Path $cacheDir "frpc-$frpVer.exe"
+if (-not (Test-Path $frpcCache)) {
+    Write-Host "Downloading frp v$frpVer..." -ForegroundColor Cyan
+    $frpZip = Join-Path $cacheDir "frp-$frpVer.zip"
+    Invoke-WebRequest -Uri $frpUrl -OutFile $frpZip -UseBasicParsing
+    $frpExtract = Join-Path $cacheDir "frp-$frpVer"
+    if (Test-Path $frpExtract) { Remove-Item -Recurse -Force $frpExtract }
+    Expand-Archive -Path $frpZip -DestinationPath $frpExtract -Force
+    Copy-Item (Join-Path $frpExtract "frp_${frpVer}_windows_amd64\frpc.exe") $frpcCache -Force
+}
+Copy-Item $frpcCache (Join-Path $binDir "frpc-$triple.exe") -Force
+Write-Host "Staged sidecar: desktop\binaries\frpc-$triple.exe" -ForegroundColor Green
+
 $tplDir = Join-Path $root "desktop\resources\templates"
 New-Item -ItemType Directory -Force -Path $tplDir | Out-Null
 Copy-Item "$root\templates\*.yaml" $tplDir -Force
