@@ -30,25 +30,32 @@ import (
 // Server is a persisted game-server record. Live status is not stored; it's
 // queried from the runtime on demand.
 type Server struct {
-	ID            string               `json:"id"`
-	Name          string               `json:"name"`
-	TemplateID    string               `json:"templateId"`
-	Game          string               `json:"game"`
-	Image         string               `json:"image"`
-	Env           map[string]string    `json:"env"`
-	Ports         []docker.PortMapping `json:"ports"`
-	MemoryMB      int                  `json:"memoryMB"`
+	ID         string               `json:"id"`
+	Name       string               `json:"name"`
+	TemplateID string               `json:"templateId"`
+	Game       string               `json:"game"`
+	Image      string               `json:"image"`
+	Env        map[string]string    `json:"env"`
+	Ports      []docker.PortMapping `json:"ports"`
+	MemoryMB   int                  `json:"memoryMB"`
 	// CPUs caps CPU cores for this server (e.g. 1.5). 0 leaves CPU uncapped.
 	CPUs float64 `json:"cpus,omitempty"`
 	// Mods are Modrinth project slugs auto-installed by the image on start
 	// (Minecraft). Pro-only; applied via the MODRINTH_PROJECTS env var.
 	Mods          []string `json:"mods,omitempty"`
 	DataPath      string   `json:"dataPath"`
-	CommandMethod string               `json:"commandMethod"`
-	CreatedAt     string               `json:"createdAt"`
+	CommandMethod string   `json:"commandMethod"`
+	CreatedAt     string   `json:"createdAt"`
 	// RelayAddress is the public playit.gg address the user pasted back from
 	// the playit dashboard for sharing this server. Empty if not using a relay.
 	RelayAddress string `json:"relayAddress,omitempty"`
+	// UseTunnel shares this server through the built-in GameNest tunnel (a
+	// bundled frpc client + self-hosted relay), giving it a public
+	// <slug>.gn.coderaum.com address with no port-forwarding. TunnelSlug is the
+	// stable per-server slug, generated once on first enable and reused so the
+	// shared address survives restarts.
+	UseTunnel  bool   `json:"useTunnel,omitempty"`
+	TunnelSlug string `json:"tunnelSlug,omitempty"`
 	// RestartAt / BackupAt are optional daily schedule times in local "HH:MM"
 	// (24h). Empty disables that schedule.
 	RestartAt string `json:"restartAt,omitempty"`
@@ -75,6 +82,11 @@ type ServerView struct {
 	Pulling     bool   `json:"pulling"`
 	PullPercent int    `json:"pullPercent"`
 	PullStatus  string `json:"pullStatus,omitempty"`
+	// TunnelAddress is the primary public address from the built-in tunnel
+	// (<slug>.gn.coderaum.com:<port>) when this server is tunnel-shared and
+	// running; TunnelEndpoints lists every tunneled port.
+	TunnelAddress   string           `json:"tunnelAddress,omitempty"`
+	TunnelEndpoints []TunnelEndpoint `json:"tunnelEndpoints,omitempty"`
 }
 
 // CreateRequest is the payload to create a new server.
@@ -122,16 +134,55 @@ type Relay interface {
 	Stop()
 }
 
+// Tunnel is the built-in GameNest tunnel the manager drives. *tunnel.Agent
+// implements it via a small adapter, since the manager keeps its own
+// dependency-decoupled types (like Runtime/Networking/Relay). Optional (may be
+// nil). The manager calls Reconcile whenever the set of running, tunnel-shared
+// servers changes.
+type Tunnel interface {
+	Reconcile(ctx context.Context, want []TunnelWant) (map[string]TunnelAddrs, error)
+}
+
+// TunnelWant is one server the manager wants tunneled: a stable slug, the public
+// ports to request (one per role), and the local host port behind each role.
+type TunnelWant struct {
+	Slug       string
+	Ports      []TunnelPort
+	LocalPorts map[string]int // role -> host port on 127.0.0.1
+}
+
+// TunnelPort is one requested public port.
+type TunnelPort struct {
+	Role  string
+	Proto string // "tcp" | "udp"
+}
+
+// TunnelAddrs is the set of public endpoints currently serving one slug.
+type TunnelAddrs struct {
+	Endpoints []TunnelEndpoint
+}
+
+// TunnelEndpoint is one public "host:port" a friend connects to.
+type TunnelEndpoint struct {
+	Role    string `json:"role"`
+	Proto   string `json:"proto"`
+	Address string `json:"address"`
+}
+
 // Manager is a concurrency-safe store of servers backed by a JSON file.
 type Manager struct {
-	mu    sync.RWMutex
-	path  string
-	rt    Runtime
-	net   Networking // optional; nil disables auto port-forwarding
-	relay Relay      // optional; nil disables relay lifecycle management
+	mu      sync.RWMutex
+	path    string
+	rt      Runtime
+	net     Networking // optional; nil disables auto port-forwarding
+	relay   Relay      // optional; nil disables relay lifecycle management
+	tun     Tunnel     // optional; nil disables the built-in tunnel
 	reg     *templates.Registry
 	offsite *offsite.Store
 	items   map[string]*Server
+	// tunnelAddrs caches the control-plane's current public addresses by slug
+	// (mu-guarded); refreshed by syncTunnel and surfaced in ServerView.
+	tunnelAddrs map[string]TunnelAddrs
 
 	pullMu sync.Mutex
 	pulls  map[string]pullState // server id -> in-progress image download
@@ -301,6 +352,15 @@ func genID() string {
 	return hex.EncodeToString(b[:])
 }
 
+// genSlug makes a stable, DNS-label-safe public slug for a server's tunnel
+// (e.g. "gn3f9a2b1c4d"): the "gn" prefix guarantees a letter-leading label, and
+// the random suffix keeps it globally unique on the control-plane.
+func genSlug() string {
+	var b [6]byte
+	_, _ = rand.Read(b[:])
+	return "gn" + hex.EncodeToString(b[:])
+}
+
 // Get returns a server record by ID.
 func (m *Manager) Get(id string) (*Server, bool) {
 	m.mu.RLock()
@@ -321,6 +381,31 @@ func (m *Manager) SetRelayAddress(id, addr string) error {
 	err := m.save()
 	m.mu.Unlock()
 	m.syncRelay() // a server gaining/losing a relay address may flip agent state
+	return err
+}
+
+// SetTunnel attaches the built-in tunnel agent. Done via a setter (not
+// NewManager) so existing call sites and tests are unaffected. A nil agent
+// leaves the feature dormant.
+func (m *Manager) SetTunnel(t Tunnel) { m.tun = t }
+
+// SetUseTunnel turns the built-in tunnel on or off for a server. Enabling
+// assigns a stable public slug on first use. It persists the change, then
+// reconciles the live tunnel so the address appears/disappears immediately.
+func (m *Manager) SetUseTunnel(id string, on bool) error {
+	m.mu.Lock()
+	s, ok := m.items[id]
+	if !ok {
+		m.mu.Unlock()
+		return fmt.Errorf("server not found")
+	}
+	s.UseTunnel = on
+	if on && s.TunnelSlug == "" {
+		s.TunnelSlug = genSlug()
+	}
+	err := m.save()
+	m.mu.Unlock()
+	m.syncTunnel()
 	return err
 }
 
@@ -647,6 +732,7 @@ func (m *Manager) Start(ctx context.Context, id string) error {
 	}
 	m.mapPorts(ctx, s)
 	m.syncRelay()
+	m.syncTunnel()
 	return nil
 }
 
@@ -678,6 +764,7 @@ func (m *Manager) Stop(ctx context.Context, id string) error {
 	err := m.rt.Stop(ctx, s.ContainerName())
 	m.unmapPorts(ctx, s)
 	m.syncRelay()
+	m.syncTunnel()
 	return err
 }
 
@@ -722,6 +809,7 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 	err := m.save()
 	m.mu.Unlock()
 	m.syncRelay()
+	m.syncTunnel()
 	return err
 }
 
@@ -810,6 +898,62 @@ func (m *Manager) anyRelayServerRunning(ctx context.Context) bool {
 	return false
 }
 
+// syncTunnel reconciles the built-in tunnel against the set of running,
+// tunnel-shared servers and caches the resulting public addresses. Best-effort,
+// mirroring syncRelay: a failure is logged, never fatal, and never blocks the
+// server lifecycle (callers ignore its outcome). No-op when no tunnel agent is
+// attached. The reconcile makes network calls, so it runs without m held.
+func (m *Manager) syncTunnel() {
+	if m.tun == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	addrs, err := m.tun.Reconcile(ctx, m.tunnelWants(ctx))
+	if err != nil {
+		slog.Warn("tunnel: reconcile failed", "err", err)
+	}
+	m.mu.Lock()
+	m.tunnelAddrs = addrs
+	m.mu.Unlock()
+}
+
+// tunnelWants is the desired tunnel set: every running, tunnel-enabled server,
+// with one public port per local port. Roles are synthesized from the port's
+// protocol + container port (e.g. "tcp25565") — stable across restarts, unique
+// within a server, and a valid control-plane role label.
+func (m *Manager) tunnelWants(ctx context.Context) []TunnelWant {
+	m.mu.RLock()
+	candidates := make([]*Server, 0)
+	for _, s := range m.items {
+		if s.UseTunnel && s.TunnelSlug != "" {
+			candidates = append(candidates, s)
+		}
+	}
+	m.mu.RUnlock()
+
+	want := make([]TunnelWant, 0, len(candidates))
+	for _, s := range candidates {
+		if !m.rt.Inspect(ctx, s.ContainerName()).Running {
+			continue
+		}
+		w := TunnelWant{Slug: s.TunnelSlug, LocalPorts: map[string]int{}}
+		for _, p := range s.Ports {
+			proto := strings.ToLower(p.Protocol)
+			if proto != "tcp" && proto != "udp" {
+				continue // the relay only tunnels tcp/udp
+			}
+			role := proto + strconv.Itoa(p.Container)
+			w.Ports = append(w.Ports, TunnelPort{Role: role, Proto: proto})
+			w.LocalPorts[role] = p.Host
+		}
+		if len(w.Ports) > 0 {
+			want = append(want, w)
+		}
+	}
+	return want
+}
+
 // List returns all servers with their live runtime status.
 func (m *Manager) List(ctx context.Context) []ServerView {
 	m.mu.RLock()
@@ -817,6 +961,7 @@ func (m *Manager) List(ctx context.Context) []ServerView {
 	for _, s := range m.items {
 		servers = append(servers, s)
 	}
+	tunnelAddrs := m.tunnelAddrs // immutable snapshot; syncTunnel replaces the map
 	m.mu.RUnlock()
 
 	sort.Slice(servers, func(i, j int) bool { return servers[i].CreatedAt < servers[j].CreatedAt })
@@ -839,6 +984,14 @@ func (m *Manager) List(ctx context.Context) []ServerView {
 			view.Shared = m.net.IsMapped(primary.Host, primary.Protocol)
 			if ip := m.net.ExternalIP(); ip != "" {
 				view.ExternalAddress = ip + ":" + strconv.Itoa(primary.Host)
+			}
+		}
+		// Surface the built-in tunnel's public address(es) for a running,
+		// tunnel-shared server.
+		if st.Running && s.UseTunnel && s.TunnelSlug != "" {
+			if ta, ok := tunnelAddrs[s.TunnelSlug]; ok && len(ta.Endpoints) > 0 {
+				view.TunnelEndpoints = ta.Endpoints
+				view.TunnelAddress = ta.Endpoints[0].Address
 			}
 		}
 		views = append(views, view)

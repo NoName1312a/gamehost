@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -65,8 +66,8 @@ func (f *fakeRuntime) ExportBackup(_ context.Context, _, _ string, w io.Writer) 
 	_, err := w.Write(f.exportData)
 	return err
 }
-func (f *fakeRuntime) ImageExists(context.Context, string) bool                    { return true }
-func (f *fakeRuntime) Pull(context.Context, string, func(int, string)) error       { return nil }
+func (f *fakeRuntime) ImageExists(context.Context, string) bool              { return true }
+func (f *fakeRuntime) Pull(context.Context, string, func(int, string)) error { return nil }
 
 // fakeRelay records start/stop calls so tests can assert the agent's lifecycle.
 type fakeRelay struct {
@@ -574,5 +575,119 @@ func TestDelete(t *testing.T) {
 	}
 	if _, ok := m.Get(s.ID); ok {
 		t.Error("server still present after delete")
+	}
+}
+
+// fakeTunnel records Reconcile calls and echoes back a public address per slug,
+// so manager tests can assert what gets shared and how it surfaces in views.
+type fakeTunnel struct {
+	calls    int
+	lastWant []TunnelWant
+}
+
+func (f *fakeTunnel) Reconcile(_ context.Context, want []TunnelWant) (map[string]TunnelAddrs, error) {
+	f.calls++
+	f.lastWant = want
+	out := map[string]TunnelAddrs{}
+	for _, w := range want {
+		eps := make([]TunnelEndpoint, 0, len(w.Ports))
+		for _, p := range w.Ports {
+			eps = append(eps, TunnelEndpoint{
+				Role:    p.Role,
+				Proto:   p.Proto,
+				Address: w.Slug + ".gn.coderaum.com:39999",
+			})
+		}
+		out[w.Slug] = TunnelAddrs{Endpoints: eps}
+	}
+	return out, nil
+}
+
+func TestTunnelSharesRunningServersOnly(t *testing.T) {
+	reg := testRegistry(t)
+	rt := &fakeRuntime{running: map[string]bool{}}
+	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	if err != nil {
+		t.Fatalf("new manager: %v", err)
+	}
+	tun := &fakeTunnel{}
+	m.SetTunnel(tun)
+
+	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "Shared", Port: 25565})
+	ctx := context.Background()
+
+	// Enabling assigns a stable slug; the server isn't running yet, so nothing
+	// is shared.
+	if err := m.SetUseTunnel(s.ID, true); err != nil {
+		t.Fatalf("set use-tunnel: %v", err)
+	}
+	got, _ := m.Get(s.ID)
+	if !got.UseTunnel || got.TunnelSlug == "" {
+		t.Fatalf("UseTunnel/TunnelSlug not set: %+v", got)
+	}
+	slug := got.TunnelSlug
+	if len(tun.lastWant) != 0 {
+		t.Fatalf("nothing should be shared before the server runs, got %+v", tun.lastWant)
+	}
+
+	// Starting it shares this server: correct slug, proto, and local port.
+	if err := m.Start(ctx, s.ID); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if len(tun.lastWant) != 1 || tun.lastWant[0].Slug != slug {
+		t.Fatalf("running tunneled server should be shared, got %+v", tun.lastWant)
+	}
+	w := tun.lastWant[0]
+	if len(w.Ports) != 1 || w.Ports[0].Proto != "tcp" {
+		t.Fatalf("want ports wrong: %+v", w.Ports)
+	}
+	if w.LocalPorts[w.Ports[0].Role] != 25565 {
+		t.Errorf("local-port mapping wrong: %+v", w.LocalPorts)
+	}
+
+	// The public address surfaces in the server view.
+	views := m.List(ctx)
+	if len(views) != 1 || !strings.HasPrefix(views[0].TunnelAddress, slug+".") {
+		t.Fatalf("ServerView should carry the tunnel address, got %+v", views[0])
+	}
+	if len(views[0].TunnelEndpoints) != 1 {
+		t.Errorf("expected one tunnel endpoint, got %+v", views[0].TunnelEndpoints)
+	}
+
+	// Stopping it releases (drops out of the desired set).
+	if err := m.Stop(ctx, s.ID); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+	if len(tun.lastWant) != 0 {
+		t.Errorf("stopped server should drop out of the shared set, got %+v", tun.lastWant)
+	}
+}
+
+var tunnelSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
+
+func TestTunnelSlugIsStableAndValid(t *testing.T) {
+	m, _ := newTestManager(t)
+	m.SetTunnel(&fakeTunnel{})
+	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "X", Port: 25565})
+
+	if err := m.SetUseTunnel(s.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	first, _ := m.Get(s.ID)
+	slug := first.TunnelSlug
+	if !tunnelSlugRe.MatchString(slug) {
+		t.Fatalf("generated slug %q is not a valid control-plane slug", slug)
+	}
+
+	// Toggling off then on must reuse the same slug (stable public address).
+	if err := m.SetUseTunnel(s.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SetUseTunnel(s.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	again, _ := m.Get(s.ID)
+	if again.TunnelSlug != slug {
+		t.Errorf("slug changed across toggle: %q -> %q", slug, again.TunnelSlug)
 	}
 }
