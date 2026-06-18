@@ -9,6 +9,7 @@ import {
   type ServerSummary,
   type Stats,
   type Template,
+  type TunnelStatus,
 } from "../lib/api";
 import { gameMetaFor } from "../lib/games";
 import { ServerConsole } from "./ServerConsole";
@@ -72,6 +73,11 @@ const relayPill = (
 const reachablePill = (
   <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] text-emerald-300 ring-1 ring-inset ring-emerald-400/20">
     reachable ✓
+  </span>
+);
+const tunnelPill = (
+  <span className="rounded-full bg-violet-400/10 px-2 py-0.5 text-[11px] text-violet-300 ring-1 ring-inset ring-violet-400/20">
+    via GameNest
   </span>
 );
 
@@ -183,12 +189,61 @@ function RelaySetup({
   );
 }
 
+// TunnelShare is the built-in GameNest tunnel: one click provisions a public
+// <slug>.gn.coderaum.com address with no router setup, no account, and no extra
+// app — the recommended sharing path when the tunnel feature is configured. It
+// supersedes the playit RelaySetup (kept as an advanced fallback).
+function TunnelShare({ s, onChanged }: { s: ServerSummary; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  async function toggle(on: boolean) {
+    setBusy(true);
+    try {
+      await api.setUseTunnel(s.id, on);
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
+  }
+
+  if (!s.useTunnel) {
+    return (
+      <div className="space-y-1">
+        <button disabled={busy} onClick={() => toggle(true)} className={primaryBtn}>
+          {busy ? "Enabling…" : "Share with friends (no setup)"}
+        </button>
+        <p className="text-xs text-zinc-500">
+          Get a public address through GameNest's relay — no port-forwarding, no account, no extra app.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      {s.tunnelAddress ? (
+        <CopyRow label="Friends connect to" addr={s.tunnelAddress} pill={tunnelPill} />
+      ) : (
+        <p className="text-xs text-zinc-400">
+          {s.running ? "Setting up your public address…" : "Starts sharing once the server is running."}
+        </p>
+      )}
+      <button
+        onClick={() => toggle(false)}
+        disabled={busy}
+        className="text-[11px] text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline disabled:opacity-50"
+      >
+        stop sharing
+      </button>
+    </div>
+  );
+}
+
 // ConnectionPanel implements "direct-first": it shows whether the port was
 // auto-forwarded (friends connect directly — nothing extra running), guides a
 // one-time manual forward when the router blocks UPnP, lets the user verify
 // reachability from the internet, and offers the playit relay as the
 // no-router-access fallback.
-function ConnectionPanel({ s, relay, onChanged }: { s: ServerSummary; relay?: Relay; onChanged: () => void }) {
+function ConnectionPanel({ s, relay, tunnel, onChanged }: { s: ServerSummary; relay?: Relay; tunnel?: TunnelStatus; onChanged: () => void }) {
   const [conn, setConn] = useState<Connectivity | null>(null);
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<Reachable | null>(null);
@@ -318,10 +373,15 @@ function ConnectionPanel({ s, relay, onChanged }: { s: ServerSummary; relay?: Re
         </div>
       )}
 
-      <div className="border-t border-zinc-800 pt-3">
+      <div className="space-y-3 border-t border-zinc-800 pt-3">
+        {/* Built-in GameNest tunnel — the recommended no-setup sharing path, when configured. */}
+        {tunnel?.configured && <TunnelShare s={s} onChanged={onChanged} />}
+
+        {/* playit.gg relay: the primary fallback when the built-in tunnel isn't
+            configured; otherwise demoted to an advanced option. */}
         {s.relayAddress ? (
           <div className="space-y-1">
-            <CopyRow label="Or via relay" addr={s.relayAddress} pill={relayPill} />
+            <CopyRow label="Or via playit relay" addr={s.relayAddress} pill={relayPill} />
             <button
               onClick={stopSharing}
               className="text-[11px] text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
@@ -329,6 +389,15 @@ function ConnectionPanel({ s, relay, onChanged }: { s: ServerSummary; relay?: Re
               change / stop relay
             </button>
           </div>
+        ) : tunnel?.configured ? (
+          <details>
+            <summary className="cursor-pointer text-xs text-zinc-400 hover:text-zinc-200">
+              Advanced: use a playit.gg relay instead →
+            </summary>
+            <div className="mt-2">
+              <RelaySetup s={s} relay={relay} port={port} proto={proto} onChanged={onChanged} />
+            </div>
+          </details>
         ) : (
           <>
             {suggestRelay && (
@@ -655,6 +724,7 @@ export function ServerDetail({
   server,
   template,
   relay,
+  tunnel,
   busy,
   onClose,
   onChanged,
@@ -665,6 +735,7 @@ export function ServerDetail({
   server: ServerSummary;
   template?: Template;
   relay?: Relay;
+  tunnel?: TunnelStatus;
   busy?: string;
   onClose: () => void;
   onChanged: () => void;
@@ -784,7 +855,7 @@ export function ServerDetail({
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
               Connection &amp; sharing
             </h3>
-            <ConnectionPanel s={server} relay={relay} onChanged={onChanged} />
+            <ConnectionPanel s={server} relay={relay} tunnel={tunnel} onChanged={onChanged} />
           </section>
 
           {/* Resources */}

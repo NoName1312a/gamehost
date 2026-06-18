@@ -7,6 +7,7 @@ import {
   type Setup,
   type Template,
   type ServerSummary,
+  type TunnelStatus,
 } from "./lib/api";
 import { ConfigureServerModal } from "./components/ConfigureServerModal";
 import { GamePicker } from "./components/GamePicker";
@@ -232,6 +233,7 @@ export default function App() {
   const runtime = useAsync<Runtime>(api.runtime, nonce + tick);
   const setup = useAsync<Setup>(api.setup, nonce + tick);
   const relay = useAsync<Relay>(api.relay, nonce + tick);
+  const tunnel = useAsync<TunnelStatus>(api.tunnel, nonce + tick);
   const templates = useAsync<Template[]>(api.templates, nonce);
   const { servers, refresh } = useServers(health.status === "ok");
 
@@ -429,6 +431,7 @@ export default function App() {
           server={detailServer}
           template={templates.status === "ok" ? templates.data.find((t) => t.id === detailServer.templateId) : undefined}
           relay={relay.status === "ok" ? relay.data : undefined}
+          tunnel={tunnel.status === "ok" ? tunnel.data : undefined}
           busy={busy[detailServer.id]}
           onClose={() => setDetailId(null)}
           onChanged={() => {

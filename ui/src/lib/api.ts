@@ -59,6 +59,21 @@ export interface Relay {
   message: string;
 }
 
+// TunnelStatus is the built-in GameNest tunnel's feature state. configured is
+// false when the engine has no control-plane URL (the feature is dormant).
+export interface TunnelStatus {
+  configured: boolean;
+  running: boolean;
+  active: number;
+  message: string;
+}
+
+export interface TunnelEndpoint {
+  role: string;
+  proto: string;
+  address: string; // public "host:port" friends connect to
+}
+
 export interface Port {
   name: string;
   container: number;
@@ -146,6 +161,10 @@ export interface ServerSummary {
   externalAddress?: string; // public "host:port" friends connect to
   shared?: boolean; // port currently forwarded on the router
   relayAddress?: string; // playit relay address the user pasted back for sharing
+  useTunnel?: boolean; // sharing via the built-in GameNest tunnel
+  tunnelSlug?: string; // stable public slug for this server's tunnel
+  tunnelAddress?: string; // primary public "host:port" via the built-in tunnel
+  tunnelEndpoints?: TunnelEndpoint[]; // all tunneled ports (game, query, …)
   restartAt?: string; // daily auto-restart time "HH:MM" (local), "" = off
   backupAt?: string; // daily backup time "HH:MM" (local), "" = off
   pulling?: boolean; // first-start image download in progress
@@ -284,6 +303,9 @@ export const api = {
   relayLink: (secret: string) => send<{ status: string }>("POST", "/api/system/relay/link", { secret }),
   setRelayAddress: (id: string, address: string) =>
     send<{ status: string }>("PUT", `/api/servers/${id}/relay-address`, { address }),
+  tunnel: () => get<TunnelStatus>("/api/system/tunnel"),
+  setUseTunnel: (id: string, on: boolean) =>
+    send<{ status: string }>("PUT", `/api/servers/${id}/use-tunnel`, { on }),
   connectivity: (id: string) => get<Connectivity>(`/api/servers/${id}/connectivity`),
   testConnectivity: (id: string) => send<Reachable>("POST", `/api/servers/${id}/connectivity/test`),
   listFiles: (id: string, path: string) =>
