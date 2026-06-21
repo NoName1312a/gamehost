@@ -17,11 +17,14 @@ type supervisor interface {
 }
 
 // Desired is one server the engine wants tunneled: a stable slug, the public
-// ports to request, and the local host port each role is bound to.
+// ports to request, the local host port each role is bound to, and an optional
+// entitlement token (opaque; forwarded verbatim to the control-plane so it can
+// grant a reserved vanity slug; "" for the free anonymous path).
 type Desired struct {
-	Slug       string
-	Ports      []PortReq
-	LocalPorts map[string]int // role -> host port on 127.0.0.1
+	Slug        string
+	Ports       []PortReq
+	LocalPorts  map[string]int // role -> host port on 127.0.0.1
+	Entitlement string         // optional; non-empty only for paying subscribers
 }
 
 // Status is the tunnel state surfaced to the UI/API.
@@ -93,7 +96,7 @@ func (a *Agent) Reconcile(ctx context.Context, want []Desired) (map[string]Alloc
 		if _, ok := a.current[slug]; ok {
 			continue
 		}
-		alloc, err := a.client.Allocate(ctx, slug, d.Ports)
+		alloc, err := a.client.Allocate(ctx, slug, d.Ports, d.Entitlement)
 		if err != nil {
 			slog.Warn("tunnel: allocate failed", "slug", slug, "err", err)
 			continue

@@ -144,12 +144,17 @@ func (c *Client) ensureDevice(ctx context.Context) (string, error) {
 }
 
 // Allocate reserves public ports for slug and returns the allocation.
-func (c *Client) Allocate(ctx context.Context, slug string, ports []PortReq) (Allocation, error) {
+// entitlement is an opaque token forwarded verbatim to the control-plane to
+// grant a reserved (vanity) slug; pass "" for the free anonymous path.
+func (c *Client) Allocate(ctx context.Context, slug string, ports []PortReq, entitlement string) (Allocation, error) {
 	token, err := c.ensureDevice(ctx)
 	if err != nil {
 		return Allocation{}, err
 	}
 	reqBody := map[string]any{"slug": slug, "ports": ports}
+	if entitlement != "" {
+		reqBody["entitlement"] = entitlement
+	}
 	var resp struct {
 		Slug   string `json:"slug"`
 		Secret string `json:"secret"`

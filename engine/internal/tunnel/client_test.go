@@ -11,6 +11,46 @@ import (
 	"testing"
 )
 
+func TestAllocateIncludesEntitlementWhenSet(t *testing.T) {
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/register":
+			_ = json.NewEncoder(w).Encode(map[string]string{"deviceId": "d", "token": "tok"})
+		case "/v1/allocate":
+			_ = json.NewDecoder(r.Body).Decode(&gotBody)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"slug": gotBody["slug"], "secret": "s",
+				"frps":    map[string]string{"addr": "a", "token": "t"},
+				"proxies": []any{},
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// NewClient(baseURL, dataDir) — real signature from client.go
+	c := NewClient(srv.URL, t.TempDir())
+
+	// Paid path: entitlement must appear in the request body.
+	if _, err := c.Allocate(context.Background(), "alice", []PortReq{{Role: "game", Proto: "tcp"}}, "ent.tok"); err != nil {
+		t.Fatalf("allocate: %v", err)
+	}
+	if gotBody["entitlement"] != "ent.tok" {
+		t.Fatalf("entitlement not forwarded: %v", gotBody["entitlement"])
+	}
+
+	// Free path: entitlement must be absent from the request body.
+	gotBody = nil
+	if _, err := c.Allocate(context.Background(), "gn-abcd12", []PortReq{{Role: "game", Proto: "tcp"}}, ""); err != nil {
+		t.Fatalf("free allocate: %v", err)
+	}
+	if _, present := gotBody["entitlement"]; present {
+		t.Fatalf("entitlement must be absent for the free path, got %v", gotBody["entitlement"])
+	}
+}
+
 // canned control-plane handler used by the client tests.
 func cpHandler(registerCalls *int, gotBearer *string, gotReleaseBody *string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +88,7 @@ func TestClientRegistersOnceAndPersistsToken(t *testing.T) {
 
 	// First client registers and stores the token.
 	c1 := NewClient(srv.URL, dir)
-	alloc, err := c1.Allocate(context.Background(), "myserver", []PortReq{{Role: "game", Proto: "udp"}})
+	alloc, err := c1.Allocate(context.Background(), "myserver", []PortReq{{Role: "game", Proto: "udp"}}, "")
 	if err != nil {
 		t.Fatalf("allocate: %v", err)
 	}
