@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/leop1/gamehost/engine/internal/account"
 	"github.com/leop1/gamehost/engine/internal/api"
 	"github.com/leop1/gamehost/engine/internal/audit"
 	"github.com/leop1/gamehost/engine/internal/auth"
@@ -56,6 +57,14 @@ func main() {
 		tunAgent = tunnel.New(cfg.DataDir, url)
 	}
 
+	// The GameNest platform account is dormant unless a platform URL is set
+	// (GAMENEST_PLATFORM_URL). When unset, no store is created and the account
+	// routes report "not configured".
+	var acctStore *account.Store
+	if url := os.Getenv("GAMENEST_PLATFORM_URL"); url != "" {
+		acctStore = account.New(cfg.DataDir, url)
+	}
+
 	reg := templates.NewRegistry(cfg.TemplatesDir)
 	if err := reg.Load(); err != nil {
 		// Non-fatal: the panel still boots so the user can see the setup wizard.
@@ -71,6 +80,9 @@ func main() {
 	}
 	if tunAgent != nil {
 		mgr.SetTunnel(api.AdaptTunnel(tunAgent))
+	}
+	if acctStore != nil {
+		mgr.SetAccount(api.AdaptAccount(acctStore))
 	}
 
 	authStore, err := auth.New(cfg.DataDir)
@@ -96,7 +108,7 @@ func main() {
 		Handler: api.NewRouter(api.Deps{
 			Cfg: cfg, RT: rt, Reg: reg, Mgr: mgr, Net: netMapper, Relay: relayAgent, Tunnel: tunAgent,
 			Auth: authStore, Remote: remoteCtrl, Audit: auditLog, License: licenseStore,
-			Telemetry: telStore,
+			Telemetry: telStore, Account: acctStore,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

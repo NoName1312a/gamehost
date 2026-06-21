@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/leop1/gamehost/engine/internal/account"
 	"github.com/leop1/gamehost/engine/internal/audit"
 	"github.com/leop1/gamehost/engine/internal/auth"
 	"github.com/leop1/gamehost/engine/internal/config"
@@ -44,6 +45,10 @@ type Deps struct {
 	Audit     *audit.Logger
 	License   *license.Store
 	Telemetry *telemetry.Store
+	// Account is the GameNest platform account store. Nil (GAMENEST_PLATFORM_URL
+	// unset) leaves account routes dormant: GET /api/account reports
+	// configured=false, link/unlink return 503.
+	Account *account.Store
 }
 
 // API bundles the dependencies handlers need.
@@ -60,6 +65,7 @@ type API struct {
 	audit        *audit.Logger
 	license      *license.Store
 	telemetry    *telemetry.Store
+	account      *account.Store
 	loginLimiter *loginLimiter
 }
 
@@ -68,7 +74,7 @@ type API struct {
 func NewRouter(d Deps) http.Handler {
 	a := &API{cfg: d.Cfg, rt: d.RT, reg: d.Reg, mgr: d.Mgr, net: d.Net, relay: d.Relay, tunnel: d.Tunnel,
 		auth: d.Auth, remote: d.Remote, audit: d.Audit, license: d.License, telemetry: d.Telemetry,
-		loginLimiter: newLoginLimiter(5, 5*time.Minute)}
+		account: d.Account, loginLimiter: newLoginLimiter(5, 5*time.Minute)}
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -103,6 +109,10 @@ func NewRouter(d Deps) http.Handler {
 			r.Post("/license", a.setLicense)
 			r.Delete("/license", a.clearLicense)
 
+			r.Get("/account", a.accountStatus)
+			r.Post("/account/link", a.linkAccount)
+			r.Delete("/account/link", a.unlinkAccount)
+
 			r.Get("/users", a.listUsers)
 			r.Post("/users", a.addUser)
 			r.Delete("/users/{username}", a.deleteUser)
@@ -131,6 +141,7 @@ func NewRouter(d Deps) http.Handler {
 			r.Patch("/servers/{id}", a.updateServer)
 			r.Put("/servers/{id}/relay-address", a.setRelayAddress)
 			r.Put("/servers/{id}/use-tunnel", a.setUseTunnel)
+			r.Put("/servers/{id}/vanity", a.setVanitySlug)
 			r.Get("/servers/{id}/connectivity", a.connectivity)
 			r.Post("/servers/{id}/connectivity/test", a.connectivityTest)
 			r.Get("/servers/{id}/files", a.listFiles)
