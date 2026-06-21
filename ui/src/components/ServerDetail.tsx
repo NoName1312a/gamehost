@@ -257,6 +257,7 @@ function TunnelShare({ s, account, onChanged }: { s: ServerSummary; account?: Ac
             <input
               value={vanityName}
               onChange={(e) => setVanityName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyVanity(); } }}
               placeholder={s.tunnelSlug ?? "your-name"}
               className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 font-mono text-xs text-zinc-100 outline-none focus:border-emerald-500"
             />

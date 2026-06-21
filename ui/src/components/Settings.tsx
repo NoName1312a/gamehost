@@ -183,6 +183,7 @@ export function Settings({
   }
 
   async function linkAccount() {
+    if (!linkCode.trim()) return;
     setAcctBusy(true);
     setAcctError(null);
     try {
