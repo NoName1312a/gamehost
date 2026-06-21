@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -704,14 +705,19 @@ func TestGenSlugMatchesRelayFreeNamespace(t *testing.T) {
 
 // fakeAccount is a fake Account collaborator for manager tests.
 // It records the last slug it was asked for and returns a canned token.
+// If err is non-nil, Entitlement returns that error instead (for error-path tests).
 type fakeAccount struct {
 	linked  bool
 	gotSlug string
+	err     error // when non-nil, Entitlement returns this error
 }
 
 func (f *fakeAccount) Linked() bool { return f.linked }
 func (f *fakeAccount) Entitlement(_ context.Context, slug string) (string, error) {
 	f.gotSlug = slug
+	if f.err != nil {
+		return "", f.err
+	}
 	return "ent-" + slug, nil
 }
 
@@ -798,6 +804,43 @@ func TestGnSlugGetsEmptyEntitlement(t *testing.T) {
 	}
 	if tun.lastWant[0].Entitlement != "" {
 		t.Errorf("gn- slug should have empty entitlement, got %q", tun.lastWant[0].Entitlement)
+	}
+}
+
+// TestVanitySlugEntitlementErrorSkipsServer verifies the best-effort error path:
+// when Entitlement returns an error for a vanity-slug server, that server is
+// skipped (no TunnelWant emitted) but the sync does not crash or return an error.
+func TestVanitySlugEntitlementErrorSkipsServer(t *testing.T) {
+	reg := testRegistry(t)
+	rt := &fakeRuntime{running: map[string]bool{}}
+	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	if err != nil {
+		t.Fatalf("new manager: %v", err)
+	}
+	tun := &fakeTunnel{}
+	m.SetTunnel(tun)
+	m.SetAccount(&fakeAccount{linked: true, err: fmt.Errorf("platform unreachable")})
+
+	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "ErrServer", Port: 25565})
+	ctx := context.Background()
+
+	// Enable tunnel so the server gets a gn- slug, then set a vanity slug.
+	if err := m.SetUseTunnel(s.ID, true); err != nil {
+		t.Fatalf("set use-tunnel: %v", err)
+	}
+	if err := m.SetVanitySlug(s.ID, "broken"); err != nil {
+		t.Fatalf("SetVanitySlug: %v", err)
+	}
+
+	// Start the server — this triggers syncTunnel internally.
+	if err := m.Start(ctx, s.ID); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	// The entitlement fetch failed, so no TunnelWant should be emitted for this
+	// server — best-effort skip, not a crash or abort.
+	if len(tun.lastWant) != 0 {
+		t.Errorf("expected 0 tunnel wants when entitlement errors, got %d: %+v", len(tun.lastWant), tun.lastWant)
 	}
 }
 
