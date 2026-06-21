@@ -701,3 +701,150 @@ func TestGenSlugMatchesRelayFreeNamespace(t *testing.T) {
 		}
 	}
 }
+
+// fakeAccount is a fake Account collaborator for manager tests.
+// It records the last slug it was asked for and returns a canned token.
+type fakeAccount struct {
+	linked  bool
+	gotSlug string
+}
+
+func (f *fakeAccount) Linked() bool { return f.linked }
+func (f *fakeAccount) Entitlement(_ context.Context, slug string) (string, error) {
+	f.gotSlug = slug
+	return "ent-" + slug, nil
+}
+
+// TestVanitySlugEntitlementFetched verifies that a running server with a vanity
+// slug (not "gn-") and a linked account gets an entitlement fetched and
+// threaded through into TunnelWant.Entitlement.
+func TestVanitySlugEntitlementFetched(t *testing.T) {
+	reg := testRegistry(t)
+	rt := &fakeRuntime{running: map[string]bool{}}
+	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	if err != nil {
+		t.Fatalf("new manager: %v", err)
+	}
+	tun := &fakeTunnel{}
+	m.SetTunnel(tun)
+	acct := &fakeAccount{linked: true}
+	m.SetAccount(acct)
+
+	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "VanityServer", Port: 25565})
+	ctx := context.Background()
+
+	// Enable tunnel first so the server has UseTunnel=true + an auto gn- slug.
+	if err := m.SetUseTunnel(s.ID, true); err != nil {
+		t.Fatalf("set use-tunnel: %v", err)
+	}
+
+	// Set a vanity slug — must succeed for a valid name.
+	if err := m.SetVanitySlug(s.ID, "alice"); err != nil {
+		t.Fatalf("SetVanitySlug: %v", err)
+	}
+	got, _ := m.Get(s.ID)
+	if got.TunnelSlug != "alice" {
+		t.Fatalf("TunnelSlug = %q, want %q", got.TunnelSlug, "alice")
+	}
+
+	// Start the server so it appears in tunnelWants.
+	if err := m.Start(ctx, s.ID); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	// The fakeTunnel's lastWant should have one entry with the vanity slug and
+	// an entitlement matching what fakeAccount returns.
+	if len(tun.lastWant) != 1 {
+		t.Fatalf("expected 1 tunnel want, got %d: %+v", len(tun.lastWant), tun.lastWant)
+	}
+	w := tun.lastWant[0]
+	if w.Slug != "alice" {
+		t.Errorf("want slug = %q, got %q", "alice", w.Slug)
+	}
+	if w.Entitlement != "ent-alice" {
+		t.Errorf("want entitlement = %q, got %q", "ent-alice", w.Entitlement)
+	}
+	if acct.gotSlug != "alice" {
+		t.Errorf("fakeAccount was asked for slug %q, want %q", acct.gotSlug, "alice")
+	}
+}
+
+// TestGnSlugGetsEmptyEntitlement verifies that a server with an auto gn- slug
+// always gets an empty Entitlement in TunnelWant (even if account is linked).
+func TestGnSlugGetsEmptyEntitlement(t *testing.T) {
+	reg := testRegistry(t)
+	rt := &fakeRuntime{running: map[string]bool{}}
+	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	if err != nil {
+		t.Fatalf("new manager: %v", err)
+	}
+	tun := &fakeTunnel{}
+	m.SetTunnel(tun)
+	m.SetAccount(&fakeAccount{linked: true}) // linked, but slug is gn-
+
+	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "GnServer", Port: 25565})
+	ctx := context.Background()
+
+	if err := m.SetUseTunnel(s.ID, true); err != nil {
+		t.Fatalf("set use-tunnel: %v", err)
+	}
+	// Do NOT call SetVanitySlug — the slug stays as the generated gn- one.
+	if err := m.Start(ctx, s.ID); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	if len(tun.lastWant) != 1 {
+		t.Fatalf("expected 1 tunnel want, got %d", len(tun.lastWant))
+	}
+	if tun.lastWant[0].Entitlement != "" {
+		t.Errorf("gn- slug should have empty entitlement, got %q", tun.lastWant[0].Entitlement)
+	}
+}
+
+// TestSetVanitySlugValidation verifies the slug validation rules:
+// - "gn-" prefix is rejected
+// - names with invalid chars are rejected
+// - empty name reverts to an auto gn- slug
+func TestSetVanitySlugValidation(t *testing.T) {
+	m, _ := newTestManager(t)
+	m.SetTunnel(&fakeTunnel{})
+
+	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "V", Port: 25565})
+	if err := m.SetUseTunnel(s.ID, true); err != nil {
+		t.Fatalf("set use-tunnel: %v", err)
+	}
+
+	// gn- prefix must be rejected.
+	if err := m.SetVanitySlug(s.ID, "gn-bad"); err == nil {
+		t.Error("SetVanitySlug(gn-bad) should return an error")
+	}
+
+	// Invalid chars (uppercase, space) must be rejected.
+	if err := m.SetVanitySlug(s.ID, "Bad Name"); err == nil {
+		t.Error("SetVanitySlug(Bad Name) should return an error")
+	}
+
+	// Slugs starting with a hyphen must be rejected (regex requires [a-z0-9] at start).
+	if err := m.SetVanitySlug(s.ID, "-bad"); err == nil {
+		t.Error("SetVanitySlug(-bad) should return an error")
+	}
+
+	// A valid name must succeed.
+	if err := m.SetVanitySlug(s.ID, "my-server"); err != nil {
+		t.Errorf("SetVanitySlug(my-server) should succeed, got %v", err)
+	}
+	got, _ := m.Get(s.ID)
+	if got.TunnelSlug != "my-server" {
+		t.Errorf("TunnelSlug = %q, want my-server", got.TunnelSlug)
+	}
+
+	// Empty name reverts to an auto gn- slug.
+	if err := m.SetVanitySlug(s.ID, ""); err != nil {
+		t.Errorf("SetVanitySlug empty should succeed (revert), got %v", err)
+	}
+	reverted, _ := m.Get(s.ID)
+	gnRe := regexp.MustCompile(`^gn-[a-z0-9]{4,50}$`)
+	if !gnRe.MatchString(reverted.TunnelSlug) {
+		t.Errorf("after revert, TunnelSlug = %q, want gn- pattern", reverted.TunnelSlug)
+	}
+}

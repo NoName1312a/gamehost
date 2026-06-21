@@ -58,7 +58,7 @@ func AdaptTunnel(ag *tunnel.Agent) server.Tunnel { return tunnelAdapter{ag: ag} 
 func (t tunnelAdapter) Reconcile(ctx context.Context, want []server.TunnelWant) (map[string]server.TunnelAddrs, error) {
 	desired := make([]tunnel.Desired, 0, len(want))
 	for _, w := range want {
-		d := tunnel.Desired{Slug: w.Slug, LocalPorts: w.LocalPorts}
+		d := tunnel.Desired{Slug: w.Slug, LocalPorts: w.LocalPorts, Entitlement: w.Entitlement}
 		for _, p := range w.Ports {
 			d.Ports = append(d.Ports, tunnel.PortReq{Role: p.Role, Proto: p.Proto})
 		}

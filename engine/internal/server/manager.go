@@ -143,12 +143,27 @@ type Tunnel interface {
 	Reconcile(ctx context.Context, want []TunnelWant) (map[string]TunnelAddrs, error)
 }
 
+// Account is the subscription account the manager consults to obtain
+// entitlement tokens for vanity slugs. Optional (may be nil). It is wired via
+// SetAccount (not NewManager) to keep existing call sites and tests unaffected.
+type Account interface {
+	// Linked reports whether the device has a bound account (i.e. a valid
+	// credential is present). When false, no entitlement fetch is attempted.
+	Linked() bool
+	// Entitlement fetches a fresh signed entitlement token for the given vanity
+	// slug. The token is forwarded verbatim to the control-plane so it can grant
+	// use of the reserved slug namespace.
+	Entitlement(ctx context.Context, slug string) (string, error)
+}
+
 // TunnelWant is one server the manager wants tunneled: a stable slug, the public
-// ports to request (one per role), and the local host port behind each role.
+// ports to request (one per role), the local host port behind each role, and an
+// optional entitlement token for vanity (non-gn-) slugs.
 type TunnelWant struct {
-	Slug       string
-	Ports      []TunnelPort
-	LocalPorts map[string]int // role -> host port on 127.0.0.1
+	Slug        string
+	Ports       []TunnelPort
+	LocalPorts  map[string]int // role -> host port on 127.0.0.1
+	Entitlement string         // non-empty only for vanity slugs with a linked account
 }
 
 // TunnelPort is one requested public port.
@@ -177,6 +192,7 @@ type Manager struct {
 	net     Networking // optional; nil disables auto port-forwarding
 	relay   Relay      // optional; nil disables relay lifecycle management
 	tun     Tunnel     // optional; nil disables the built-in tunnel
+	acct    Account    // optional; nil disables entitlement fetch for vanity slugs
 	reg     *templates.Registry
 	offsite *offsite.Store
 	items   map[string]*Server
@@ -389,6 +405,49 @@ func (m *Manager) SetRelayAddress(id, addr string) error {
 // NewManager) so existing call sites and tests are unaffected. A nil agent
 // leaves the feature dormant.
 func (m *Manager) SetTunnel(t Tunnel) { m.tun = t }
+
+// SetAccount attaches the subscription account collaborator. Done via a setter
+// (not NewManager) so existing call sites and tests are unaffected. A nil
+// account leaves entitlement fetching dormant.
+func (m *Manager) SetAccount(a Account) { m.acct = a }
+
+// vanitySlugRe matches a valid vanity slug: lowercase alphanum, hyphens in the
+// middle, 1–63 characters total, no gn- prefix (that namespace belongs to the
+// free auto-generated slugs).
+var vanitySlugRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
+// SetVanitySlug assigns a custom DNS-label slug to a tunnel-enabled server.
+// name must match ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ and must NOT start
+// with "gn-" (that prefix is reserved for auto-generated free slugs). An empty
+// name reverts the server to a freshly generated "gn-" slug.
+func (m *Manager) SetVanitySlug(id, name string) error {
+	if name != "" {
+		if !vanitySlugRe.MatchString(name) {
+			return fmt.Errorf("vanity slug %q is invalid: use lowercase letters, digits, and hyphens (max 63 chars, must start and end with a letter or digit)", name)
+		}
+		if strings.HasPrefix(name, "gn-") {
+			return fmt.Errorf("vanity slug %q is invalid: the gn- prefix is reserved for auto-generated slugs", name)
+		}
+	}
+	m.mu.Lock()
+	s, ok := m.items[id]
+	if !ok {
+		m.mu.Unlock()
+		return fmt.Errorf("server not found")
+	}
+	if name == "" {
+		s.TunnelSlug = genSlug()
+	} else {
+		s.TunnelSlug = name
+	}
+	err := m.save()
+	m.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	m.syncTunnel()
+	return nil
+}
 
 // SetUseTunnel turns the built-in tunnel on or off for a server. Enabling
 // assigns a stable public slug on first use. It persists the change, then
@@ -923,6 +982,11 @@ func (m *Manager) syncTunnel() {
 // with one public port per local port. Roles are synthesized from the port's
 // protocol + container port (e.g. "tcp25565") — stable across restarts, unique
 // within a server, and a valid control-plane role label.
+//
+// For servers with a vanity (non-gn-) slug and a linked account, an entitlement
+// token is fetched and attached to the want. On fetch error the server is
+// skipped (best-effort, never fatal) so one bad entitlement cannot block the
+// rest of the reconcile.
 func (m *Manager) tunnelWants(ctx context.Context) []TunnelWant {
 	m.mu.RLock()
 	candidates := make([]*Server, 0)
@@ -948,9 +1012,21 @@ func (m *Manager) tunnelWants(ctx context.Context) []TunnelWant {
 			w.Ports = append(w.Ports, TunnelPort{Role: role, Proto: proto})
 			w.LocalPorts[role] = p.Host
 		}
-		if len(w.Ports) > 0 {
-			want = append(want, w)
+		if len(w.Ports) == 0 {
+			continue
 		}
+		// Fetch an entitlement token for vanity (non-gn-) slugs when an account
+		// is linked. On error, log and skip this server's tunnel entry — best-effort.
+		if !strings.HasPrefix(s.TunnelSlug, "gn-") && m.acct != nil && m.acct.Linked() {
+			ent, err := m.acct.Entitlement(ctx, s.TunnelSlug)
+			if err != nil {
+				slog.Warn("tunnel: entitlement fetch failed; skipping tunnel for server",
+					"server", s.Name, "slug", s.TunnelSlug, "err", err)
+				continue // skip this server's tunnel entry on entitlement error
+			}
+			w.Entitlement = ent
+		}
+		want = append(want, w)
 	}
 	return want
 }
