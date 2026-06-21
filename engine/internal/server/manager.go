@@ -353,12 +353,13 @@ func genID() string {
 }
 
 // genSlug makes a stable, DNS-label-safe public slug for a server's tunnel
-// (e.g. "gn3f9a2b1c4d"): the "gn" prefix guarantees a letter-leading label, and
-// the random suffix keeps it globally unique on the control-plane.
+// (e.g. "gn-3f9a2b1c4d5e"): the "gn-" prefix satisfies the relay free
+// namespace ^gn-[a-z0-9]{4,50}$, and the random suffix keeps it globally
+// unique on the control-plane.
 func genSlug() string {
 	var b [6]byte
 	_, _ = rand.Read(b[:])
-	return "gn" + hex.EncodeToString(b[:])
+	return "gn-" + hex.EncodeToString(b[:]) // e.g. "gn-3f9a2b1c4d5e"; relay free namespace ^gn-[a-z0-9]{4,50}$
 }
 
 // Get returns a server record by ID.

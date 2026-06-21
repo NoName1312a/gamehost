@@ -691,3 +691,13 @@ func TestTunnelSlugIsStableAndValid(t *testing.T) {
 		t.Errorf("slug changed across toggle: %q -> %q", slug, again.TunnelSlug)
 	}
 }
+
+func TestGenSlugMatchesRelayFreeNamespace(t *testing.T) {
+	re := regexp.MustCompile(`^gn-[a-z0-9]{4,50}$`)
+	for i := 0; i < 100; i++ {
+		s := genSlug()
+		if !re.MatchString(s) {
+			t.Fatalf("genSlug()=%q does not match the relay free namespace ^gn-[a-z0-9]{4,50}$", s)
+		}
+	}
+}
