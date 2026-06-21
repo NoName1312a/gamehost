@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import { friendlyError } from "../lib/errors";
 import {
   api,
+  type AccountStatus,
   type BackupInfo,
   type Connectivity,
   type Reachable,
@@ -193,8 +194,12 @@ function RelaySetup({
 // <slug>.gn.coderaum.com address with no router setup, no account, and no extra
 // app — the recommended sharing path when the tunnel feature is configured. It
 // supersedes the playit RelaySetup (kept as an advanced fallback).
-function TunnelShare({ s, onChanged }: { s: ServerSummary; onChanged: () => void }) {
+function TunnelShare({ s, account, onChanged }: { s: ServerSummary; account?: AccountStatus; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [vanityName, setVanityName] = useState("");
+  const [vanityBusy, setVanityBusy] = useState(false);
+  const [vanityError, setVanityError] = useState<string | null>(null);
+
   async function toggle(on: boolean) {
     setBusy(true);
     try {
@@ -204,6 +209,23 @@ function TunnelShare({ s, onChanged }: { s: ServerSummary; onChanged: () => void
       onChanged();
     }
   }
+
+  async function applyVanity() {
+    if (!vanityName.trim()) return;
+    setVanityBusy(true);
+    setVanityError(null);
+    try {
+      await api.setVanity(s.id, vanityName.trim());
+      setVanityName("");
+      onChanged();
+    } catch (e) {
+      setVanityError(friendlyError(e));
+    } finally {
+      setVanityBusy(false);
+    }
+  }
+
+  const plusLinked = account?.configured && account?.linked;
 
   if (!s.useTunnel) {
     return (
@@ -227,6 +249,28 @@ function TunnelShare({ s, onChanged }: { s: ServerSummary; onChanged: () => void
           {s.running ? "Setting up your public address…" : "Starts sharing once the server is running."}
         </p>
       )}
+      {/* Vanity name control — only when Plus account is linked */}
+      {plusLinked && (
+        <div className="mt-2 space-y-1 border-t border-zinc-800 pt-2">
+          <p className="text-[11px] text-zinc-500">Use my GameNest name</p>
+          <div className="flex gap-2">
+            <input
+              value={vanityName}
+              onChange={(e) => setVanityName(e.target.value)}
+              placeholder={s.tunnelSlug ?? "your-name"}
+              className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 font-mono text-xs text-zinc-100 outline-none focus:border-emerald-500"
+            />
+            <button
+              onClick={applyVanity}
+              disabled={vanityBusy || !vanityName.trim()}
+              className="shrink-0 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {vanityBusy ? "…" : "Set"}
+            </button>
+          </div>
+          {vanityError && <p className="text-[11px] text-rose-400">{vanityError}</p>}
+        </div>
+      )}
       <button
         onClick={() => toggle(false)}
         disabled={busy}
@@ -243,7 +287,7 @@ function TunnelShare({ s, onChanged }: { s: ServerSummary; onChanged: () => void
 // one-time manual forward when the router blocks UPnP, lets the user verify
 // reachability from the internet, and offers the playit relay as the
 // no-router-access fallback.
-function ConnectionPanel({ s, relay, tunnel, onChanged }: { s: ServerSummary; relay?: Relay; tunnel?: TunnelStatus; onChanged: () => void }) {
+function ConnectionPanel({ s, relay, tunnel, account, onChanged }: { s: ServerSummary; relay?: Relay; tunnel?: TunnelStatus; account?: AccountStatus; onChanged: () => void }) {
   const [conn, setConn] = useState<Connectivity | null>(null);
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<Reachable | null>(null);
@@ -375,7 +419,7 @@ function ConnectionPanel({ s, relay, tunnel, onChanged }: { s: ServerSummary; re
 
       <div className="space-y-3 border-t border-zinc-800 pt-3">
         {/* Built-in GameNest tunnel — the recommended no-setup sharing path, when configured. */}
-        {tunnel?.configured && <TunnelShare s={s} onChanged={onChanged} />}
+        {tunnel?.configured && <TunnelShare s={s} account={account} onChanged={onChanged} />}
 
         {/* playit.gg relay: the primary fallback when the built-in tunnel isn't
             configured; otherwise demoted to an advanced option. */}
@@ -725,6 +769,7 @@ export function ServerDetail({
   template,
   relay,
   tunnel,
+  account,
   busy,
   onClose,
   onChanged,
@@ -736,6 +781,7 @@ export function ServerDetail({
   template?: Template;
   relay?: Relay;
   tunnel?: TunnelStatus;
+  account?: AccountStatus;
   busy?: string;
   onClose: () => void;
   onChanged: () => void;
@@ -855,7 +901,7 @@ export function ServerDetail({
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
               Connection &amp; sharing
             </h3>
-            <ConnectionPanel s={server} relay={relay} tunnel={tunnel} onChanged={onChanged} />
+            <ConnectionPanel s={server} relay={relay} tunnel={tunnel} account={account} onChanged={onChanged} />
           </section>
 
           {/* Resources */}

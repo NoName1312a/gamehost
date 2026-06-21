@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   api,
+  type AccountStatus,
   type Health,
   type Relay,
   type Runtime,
@@ -234,6 +235,7 @@ export default function App() {
   const setup = useAsync<Setup>(api.setup, nonce + tick);
   const relay = useAsync<Relay>(api.relay, nonce + tick);
   const tunnel = useAsync<TunnelStatus>(api.tunnel, nonce + tick);
+  const account = useAsync<AccountStatus>(api.account, nonce + tick);
   const templates = useAsync<Template[]>(api.templates, nonce);
   const { servers, refresh } = useServers(health.status === "ok");
 
@@ -432,6 +434,7 @@ export default function App() {
           template={templates.status === "ok" ? templates.data.find((t) => t.id === detailServer.templateId) : undefined}
           relay={relay.status === "ok" ? relay.data : undefined}
           tunnel={tunnel.status === "ok" ? tunnel.data : undefined}
+          account={account.status === "ok" ? account.data : undefined}
           busy={busy[detailServer.id]}
           onClose={() => setDetailId(null)}
           onChanged={() => {

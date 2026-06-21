@@ -204,6 +204,13 @@ export interface LicenseInfo {
   pro: boolean;
 }
 
+// AccountStatus is the GameNest Plus account feature state. configured is
+// false when the engine has no platform URL (the feature is dormant).
+export interface AccountStatus {
+  configured: boolean;
+  linked: boolean;
+}
+
 export interface Offsite {
   dir: string;
 }
@@ -306,6 +313,11 @@ export const api = {
   tunnel: () => get<TunnelStatus>("/api/system/tunnel"),
   setUseTunnel: (id: string, on: boolean) =>
     send<{ status: string }>("PUT", `/api/servers/${id}/use-tunnel`, { on }),
+  account: () => get<AccountStatus>("/api/account"),
+  linkAccount: (code: string) => send<AccountStatus>("POST", "/api/account/link", { code }),
+  unlinkAccount: () => send<AccountStatus>("DELETE", "/api/account/link"),
+  setVanity: (id: string, name: string) =>
+    send<{ status: string }>("PUT", `/api/servers/${id}/vanity`, { name }),
   connectivity: (id: string) => get<Connectivity>(`/api/servers/${id}/connectivity`),
   testConnectivity: (id: string) => send<Reachable>("POST", `/api/servers/${id}/connectivity/test`),
   listFiles: (id: string, path: string) =>

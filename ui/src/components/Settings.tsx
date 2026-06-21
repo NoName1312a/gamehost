@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type LicenseInfo, type RemoteAccess, type Telemetry, type UserInfo } from "../lib/api";
+import { api, type AccountStatus, type LicenseInfo, type RemoteAccess, type Telemetry, type UserInfo } from "../lib/api";
 import { appVersion, applyUpdate, checkForUpdate, isDesktop, type UpdateInfo } from "../lib/updater";
 import { friendlyError } from "../lib/errors";
 
@@ -27,6 +27,11 @@ export function Settings({
   const [licKey, setLicKey] = useState("");
   const [licBusy, setLicBusy] = useState(false);
   const [licError, setLicError] = useState<string | null>(null);
+
+  const [account, setAccount] = useState<AccountStatus | null>(null);
+  const [linkCode, setLinkCode] = useState("");
+  const [acctBusy, setAcctBusy] = useState(false);
+  const [acctError, setAcctError] = useState<string | null>(null);
 
   const [offsiteDir, setOffsiteDir] = useState("");
   const [offBusy, setOffBusy] = useState(false);
@@ -91,6 +96,7 @@ export function Settings({
     appVersion().then(setAppVer).catch(() => setAppVer(null));
     api.remoteAccess().then(setRemote).catch(() => setRemote(null));
     api.license().then(setLicense).catch(() => setLicense(null));
+    api.account().then(setAccount).catch(() => setAccount(null));
     api
       .offsite()
       .then((o) => setOffsiteDir(o.dir))
@@ -173,6 +179,31 @@ export function Settings({
       setLicError(friendlyError(e));
     } finally {
       setLicBusy(false);
+    }
+  }
+
+  async function linkAccount() {
+    setAcctBusy(true);
+    setAcctError(null);
+    try {
+      setAccount(await api.linkAccount(linkCode.trim()));
+      setLinkCode("");
+    } catch (e) {
+      setAcctError(friendlyError(e));
+    } finally {
+      setAcctBusy(false);
+    }
+  }
+
+  async function unlinkAccount() {
+    setAcctBusy(true);
+    setAcctError(null);
+    try {
+      setAccount(await api.unlinkAccount());
+    } catch (e) {
+      setAcctError(friendlyError(e));
+    } finally {
+      setAcctBusy(false);
     }
   }
 
@@ -342,6 +373,64 @@ export function Settings({
           )}
           {raError && <p className="mt-2 text-xs text-rose-400">{raError}</p>}
         </div>
+
+        {/* GameNest Plus account — only shown when the platform is configured */}
+        {account?.configured && (
+          <div className="mt-5 border-t border-zinc-800 pt-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-zinc-200">GameNest Plus</h3>
+              {account.linked && (
+                <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300 ring-1 ring-inset ring-emerald-400/20">
+                  Plus
+                </span>
+              )}
+            </div>
+            {account.linked ? (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs text-zinc-400">
+                  ✓ Linked — your Plus features (vanity tunnel names, higher capacity) are active on this machine.
+                </p>
+                <button
+                  onClick={unlinkAccount}
+                  disabled={acctBusy}
+                  className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                >
+                  {acctBusy ? "…" : "Unlink account"}
+                </button>
+              </div>
+            ) : (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs text-zinc-500">
+                  Link your GameNest Plus account to unlock vanity tunnel names and higher capacity. Get your link
+                  code from the{" "}
+                  <a
+                    href="https://gamenest.cc/dashboard"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-emerald-400 hover:underline"
+                  >
+                    dashboard at gamenest.cc
+                  </a>
+                  .
+                </p>
+                <input
+                  value={linkCode}
+                  onChange={(e) => setLinkCode(e.target.value)}
+                  placeholder="Paste your link code"
+                  className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100 outline-none focus:border-emerald-500"
+                />
+                <button
+                  onClick={linkAccount}
+                  disabled={acctBusy || !linkCode.trim()}
+                  className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
+                >
+                  {acctBusy ? "Linking…" : "Link account"}
+                </button>
+              </div>
+            )}
+            {acctError && <p className="mt-2 text-xs text-rose-400">{acctError}</p>}
+          </div>
+        )}
 
         <div className="mt-5 border-t border-zinc-800 pt-4">
           <div className="flex items-center justify-between">
