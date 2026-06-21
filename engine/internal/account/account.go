@@ -56,9 +56,9 @@ func (s *Store) loadToken() string {
 	content := strings.TrimSpace(string(b))
 	rest, ok := strings.CutPrefix(content, secretPrefix)
 	if !ok {
-		// legacy plaintext fall-through (shouldn't happen for this package, but
-		// mirrors the tunnel client's defensive read)
-		return content
+		// no gh1: prefix → not a valid protected token; treat as absent
+		// (this package has no legacy plaintext to migrate)
+		return ""
 	}
 	enc, err := base64.StdEncoding.DecodeString(rest)
 	if err != nil {

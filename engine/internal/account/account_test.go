@@ -26,6 +26,8 @@ func TestLinkThenEntitlement(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&b)
 			gotSlug = b["slug"]
 			_ = json.NewEncoder(w).Encode(map[string]any{"token": "ent.tok", "exp": 123})
+		default:
+			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
 	defer srv.Close()
