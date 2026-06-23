@@ -28,3 +28,6 @@ desktop/gen/
 
 # Local planning/agent artifacts
 .claude/
+
+# brainstorming visual-companion mockups
+.superpowers/
