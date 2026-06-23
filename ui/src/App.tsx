@@ -334,7 +334,10 @@ export default function App() {
   const detailServer = detailId ? servers?.find((s) => s.id === detailId) ?? null : null;
 
   return (
-    <div className="mx-auto min-h-screen max-w-6xl">
+    <>
+      <div className="bg-glow" aria-hidden />
+      <div className="grain" aria-hidden />
+      <div className="relative z-10 mx-auto min-h-screen max-w-6xl">
       <Header onMenu={() => setMenuOpen(true)} />
       {updateInfo && (
         <div className="mx-6 mt-6 flex items-center justify-between gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3">
@@ -490,6 +493,7 @@ export default function App() {
         </div>
       )}
     </div>
+    </>
   );
 }
 
