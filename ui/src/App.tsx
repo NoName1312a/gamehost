@@ -116,7 +116,7 @@ function ReadyBanner({ runtime }: { runtime: Async<Runtime> }) {
   if (runtime.status !== "ok" || !runtime.data.connected) return null;
   const { serverVersion } = runtime.data;
   return (
-    <div className="panel mx-6 mt-6 flex items-center gap-3 px-4 py-3">
+    <div className="panel mx-6 mt-6 flex items-center gap-3 px-4 py-3 ring-1 ring-emerald-500/40">
       <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
       <p className="text-sm text-emerald-200">
         Docker connected{serverVersion ? ` — engine v${serverVersion}` : ""}. You're ready to host.

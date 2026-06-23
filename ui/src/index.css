@@ -12,6 +12,10 @@
   --color-accent-strong: #10b981; /* emerald-500 */
 }
 
+html, body, #root {
+  height: 100%;
+}
+
 body {
   background-color: var(--color-canvas);
   color: #e4e4e7; /* zinc-200 */
