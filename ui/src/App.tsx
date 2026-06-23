@@ -21,6 +21,7 @@ import { Changelog } from "./components/Changelog";
 import { changelog as changelogEntries, entriesSince, type ChangelogEntry } from "./lib/changelog";
 import { appVersion, checkForUpdate, type UpdateInfo } from "./lib/updater";
 import { friendlyError } from "./lib/errors";
+import { Logo } from "./components/icons";
 
 // ---- tiny async helper -----------------------------------------------------
 
@@ -100,9 +101,7 @@ function Header({ onMenu }: { onMenu: () => void }) {
           <path d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
-      <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-lg font-black text-zinc-950 shadow-lg shadow-emerald-500/20">
-        G
-      </div>
+      <Logo className="h-9 w-9 text-emerald-400" />
       <div>
         <h1 className="text-base font-semibold leading-none text-zinc-100">GameNest</h1>
         <p className="mt-0.5 text-xs text-zinc-500">Self-host game servers, simply</p>
@@ -516,9 +515,7 @@ function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
     <div className="grid min-h-screen place-items-center p-6">
       <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
         <div className="mb-4 flex items-center gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-lg font-black text-zinc-950">
-            G
-          </div>
+          <Logo className="h-9 w-9 text-emerald-400" />
           <h1 className="text-base font-semibold text-zinc-100">Sign in to GameNest</h1>
         </div>
         <label className="mb-1 block text-xs font-medium text-zinc-400">Password</label>

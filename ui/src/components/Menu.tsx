@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { Logo } from "./icons";
 
 const GITHUB_URL = "https://github.com/NoName1312a/gamehost";
 const DISCORD_URL = "https://discord.gg/gamenest";
@@ -87,9 +88,7 @@ export function Menu({
       >
         {/* Brand */}
         <div className="flex items-center gap-3 border-b border-zinc-800 px-4 py-4">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-lg font-black text-zinc-950 shadow-lg shadow-emerald-500/20">
-            G
-          </div>
+          <Logo className="h-9 w-9 text-emerald-400" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-zinc-100">GameNest</p>
             <p className="truncate text-xs text-zinc-500">{appVersion ? `v${appVersion}` : "Self-host, simply"}</p>
