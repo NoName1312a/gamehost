@@ -46,7 +46,7 @@ function CopyRow({ label, addr, pill }: { label: string; addr: string; pill: Rea
     <div className="flex items-center justify-between gap-2">
       <div className="min-w-0">
         <p className="text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
-        <code className="text-sm text-zinc-200">{addr}</code>
+        <code className="font-mono text-sm text-zinc-200">{addr}</code>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {pill}
@@ -406,7 +406,7 @@ function ConnectionPanel({ s, relay, tunnel, account, onChanged }: { s: ServerSu
             {conn?.localIP ? (
               <>
                 {" "}
-                at <code className="text-zinc-200">{conn.localIP}</code>
+                at <code className="font-mono text-zinc-200">{conn.localIP}</code>
               </>
             ) : null}
             — or use a relay below (no router setup).

@@ -103,7 +103,7 @@ function Header({ onMenu }: { onMenu: () => void }) {
       </button>
       <Logo className="h-9 w-9 text-emerald-400" />
       <div>
-        <h1 className="text-base font-semibold leading-none text-zinc-100">GameNest</h1>
+        <h1 className="font-display text-base font-semibold leading-none text-zinc-100">GameNest</h1>
         <p className="mt-0.5 text-xs text-zinc-500">Self-host game servers, simply</p>
       </div>
     </header>
@@ -116,7 +116,7 @@ function ReadyBanner({ runtime }: { runtime: Async<Runtime> }) {
   if (runtime.status !== "ok" || !runtime.data.connected) return null;
   const { serverVersion } = runtime.data;
   return (
-    <div className="mx-6 mt-6 flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+    <div className="panel mx-6 mt-6 flex items-center gap-3 px-4 py-3">
       <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
       <p className="text-sm text-emerald-200">
         Docker connected{serverVersion ? ` — engine v${serverVersion}` : ""}. You're ready to host.
@@ -154,7 +154,7 @@ function ServerCard({
           onOpen();
         }
       }}
-      className="group cursor-pointer rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 transition hover:-translate-y-0.5 hover:border-zinc-600 hover:bg-zinc-900/70 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+      className="panel group cursor-pointer p-4 transition hover:-translate-y-0.5 hover:border-zinc-600 hover:bg-zinc-900/70 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
     >
       <div className="flex items-start gap-3">
         <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${meta.gradient} text-lg`}>
@@ -362,7 +362,7 @@ export default function App() {
       {/* Servers */}
       <section className="px-6 py-8">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-zinc-100">Your servers</h2>
+          <h2 className="font-display text-lg font-semibold text-zinc-100">Your servers</h2>
           <button
             onClick={() => setShowPicker(true)}
             disabled={!runtimeReady}
@@ -386,7 +386,7 @@ export default function App() {
             ))}
           </div>
         ) : (
-          <div className="grid place-items-center rounded-2xl border border-dashed border-zinc-800 py-14 text-center">
+          <div className="panel grid place-items-center py-14 text-center">
             <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-900 text-2xl ring-1 ring-inset ring-zinc-800">
               🎮
             </div>
@@ -520,7 +520,7 @@ function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
       <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
         <div className="mb-4 flex items-center gap-3">
           <Logo className="h-9 w-9 text-emerald-400" />
-          <h1 className="text-base font-semibold text-zinc-100">Sign in to GameNest</h1>
+          <h1 className="font-display text-base font-semibold text-zinc-100">Sign in to GameNest</h1>
         </div>
         <label className="mb-1 block text-xs font-medium text-zinc-400">Password</label>
         <input
@@ -550,10 +550,10 @@ function EngineOffline({ error, onRetry }: { error: string; onRetry: () => void 
         <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-lg bg-rose-500/10 text-2xl">
           ⚠️
         </div>
-        <h1 className="text-lg font-semibold text-zinc-100">Engine not running</h1>
+        <h1 className="font-display text-lg font-semibold text-zinc-100">Engine not running</h1>
         <p className="mt-2 text-sm text-zinc-400">
           The control panel can't reach the GameNest engine at{" "}
-          <code className="rounded bg-zinc-800 px-1 py-0.5 text-zinc-300">{api.base}</code>.
+          <code className="font-mono rounded bg-zinc-800 px-1 py-0.5 text-zinc-300">{api.base}</code>.
         </p>
         <pre className="mt-4 overflow-x-auto rounded-md bg-zinc-950/70 p-3 text-left text-xs text-zinc-300 ring-1 ring-zinc-800">
 {`cd engine
