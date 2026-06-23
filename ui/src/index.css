@@ -1,18 +1,26 @@
 @import "tailwindcss";
 
+/* Design tokens — match gamenest-web. Tailwind v4 generates utilities
+   (font-display, font-sans, font-mono, text-accent, …) from these. */
 @theme {
-  --font-sans: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
-}
+  --font-display: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Hanken Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, monospace;
 
-html,
-body,
-#root {
-  height: 100%;
+  --color-canvas: #09090b;        /* zinc-950 */
+  --color-accent: #34d399;        /* emerald-400 */
+  --color-accent-strong: #10b981; /* emerald-500 */
 }
 
 body {
-  margin: 0;
-  background-color: #0a0a0b;
-  color: #e4e4e7;
+  background-color: var(--color-canvas);
+  color: #e4e4e7; /* zinc-200 */
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(52, 211, 153, 0.25);
+  color: #ecfdf5;
 }
