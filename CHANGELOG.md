@@ -9,6 +9,13 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-06-24
+
+### Changed
+- **Redesigned the server view.** Each server now opens as a tabbed page right inside the main window — **Overview · Console · Files · Settings · Backups** (plus **Mods** for Minecraft) — instead of separate full-screen console and file windows.
+- **Settings** and **Account** now open in the main window too, alongside the sidebar, rather than as pop-up dialogs.
+- A visual refresh across the new-server, sign-in, engine-offline, and "What's New" screens to match the GameNest look.
+
 ## [0.4.8] - 2026-06-24
 
 ### Added
