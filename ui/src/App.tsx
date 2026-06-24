@@ -253,6 +253,8 @@ export default function App() {
             />
           ) : view.kind === "settings" ? (
             <Settings engineVersion={version} initialUpdate={updateInfo} />
+          ) : view.kind === "account" ? (
+            <Account />
           ) : (
             <div className="h-full overflow-y-auto">
               <div className="mx-auto max-w-5xl">
@@ -281,7 +283,7 @@ export default function App() {
         </main>
       </div>
 
-      {/* Overlays — GamePicker, ConfigureServerModal, Account, Changelog, toast */}
+      {/* Overlays — GamePicker, ConfigureServerModal, Changelog, toast */}
       {showPicker && templates.status === "ok" && (
         <GamePicker
           groups={groupGames(templates.data)}
@@ -302,7 +304,6 @@ export default function App() {
           }}
         />
       )}
-      {view.kind === "account" && <Account onClose={() => setView({ kind: "dashboard" })} />}
       {whatsNew && (
         <Changelog
           title={whatsNew.title}

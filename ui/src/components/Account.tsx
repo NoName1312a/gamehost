@@ -6,21 +6,12 @@ import { Logo } from "./icons";
 // The Account screen — GameNest Plus sign-in / status. Distinct from Settings.
 // When the hosted platform isn't configured yet (the common case today), it
 // shows an honest "coming soon" state instead of a dead sign-in form.
-export function Account({ onClose }: { onClose: () => void }) {
+export function Account() {
   const [account, setAccount] = useState<AccountStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [linkCode, setLinkCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Lock background scrolling while the modal is open.
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, []);
 
   useEffect(() => {
     api
@@ -57,26 +48,18 @@ export function Account({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-6" onClick={onClose}>
-      <div
-        className="max-h-[calc(100vh-3rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-zinc-800 bg-zinc-900 p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="font-display text-lg font-semibold text-zinc-100">Account</h2>
-            {account?.linked && (
-              <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300 ring-1 ring-inset ring-emerald-400/20">
-                Plus
-              </span>
-            )}
-          </div>
-          <button onClick={onClose} className="rounded-lg px-2 py-1 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200">
-            ✕
-          </button>
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto max-w-md px-6 py-8">
+        <div className="flex items-center gap-2">
+          <h2 className="font-display text-2xl font-semibold text-zinc-100">Account</h2>
+          {account?.linked && (
+            <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300 ring-1 ring-inset ring-emerald-400/20">
+              Plus
+            </span>
+          )}
         </div>
 
-        <div className="mt-5">
+        <div className="panel p-5 mt-5">
           {loading ? (
             <p className="text-xs text-zinc-500">…</p>
           ) : account?.configured ? (
