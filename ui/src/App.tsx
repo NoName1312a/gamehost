@@ -345,7 +345,7 @@ function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
 
   return (
     <div className="grid min-h-screen place-items-center p-6">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
+      <form onSubmit={submit} className="panel w-full max-w-sm p-6">
         <div className="mb-4 flex items-center gap-3">
           <Logo className="h-9 w-9 text-emerald-400" />
           <h1 className="font-display text-base font-semibold text-zinc-100">Sign in to GameNest</h1>
@@ -374,7 +374,7 @@ function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
 function EngineOffline({ error, onRetry }: { error: string; onRetry: () => void }) {
   return (
     <div className="grid min-h-screen place-items-center p-6">
-      <div className="max-w-md rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 text-center">
+      <div className="panel max-w-md p-6 text-center">
         <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-lg bg-rose-500/10 text-2xl">
           ⚠️
         </div>
