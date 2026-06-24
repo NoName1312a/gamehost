@@ -27,7 +27,7 @@ env: {}
 variables:
   - key: RUST_SERVER_NAME
     label: Server name
-    default: A GameHost Rust server
+    default: A GameNest Rust server
     type: string
     required: false
   - key: RUST_RCON_PASSWORD

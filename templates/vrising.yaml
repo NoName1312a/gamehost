@@ -27,6 +27,6 @@ env: {}
 variables:
   - key: SERVERNAME
     label: Server name
-    default: A GameHost V Rising server
+    default: A GameNest V Rising server
     type: string
     required: false

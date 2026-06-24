@@ -28,7 +28,7 @@ env:
 variables:
   - key: CS2_SERVERNAME
     label: Server Name
-    default: GameHost CS2
+    default: GameNest CS2
     type: string
     required: true
   - key: SRCDS_TOKEN

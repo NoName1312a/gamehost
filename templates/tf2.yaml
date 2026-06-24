@@ -31,7 +31,7 @@ env: {}
 variables:
   - key: SRCDS_HOSTNAME
     label: Server name
-    default: A GameHost TF2 server
+    default: A GameNest TF2 server
     type: string
     required: false
   - key: SRCDS_RCONPW

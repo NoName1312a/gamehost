@@ -24,7 +24,7 @@ env:
 variables:
   - key: NAME
     label: Server name
-    default: A GameHost Core Keeper server
+    default: A GameNest Core Keeper server
     type: string
     required: false
   - key: MAX_PLAYERS

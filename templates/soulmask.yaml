@@ -33,7 +33,7 @@ env:
 variables:
   - key: SERVER_NAME
     label: Server name
-    default: A GameHost Soulmask server
+    default: A GameNest Soulmask server
     type: string
     required: false
   - key: SERVER_PASSWORD

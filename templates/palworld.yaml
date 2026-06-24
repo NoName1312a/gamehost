@@ -30,7 +30,7 @@ env:
 variables:
   - key: SERVER_NAME
     label: Server Name
-    default: GameHost Palworld
+    default: GameNest Palworld
     type: string
     required: true
   - key: SERVER_PASSWORD

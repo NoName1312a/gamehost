@@ -44,6 +44,6 @@ variables:
   - key: MOTD
     label: Server Message (MOTD)
     description: Text shown in the multiplayer server list
-    default: A GameHost server
+    default: A GameNest server
     type: string
     required: false

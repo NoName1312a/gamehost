@@ -29,7 +29,7 @@ env:
 variables:
   - key: SERVER_NAME
     label: Server name
-    default: A GameHost Enshrouded server
+    default: A GameNest Enshrouded server
     type: string
     required: false
   - key: SERVER_PASSWORD

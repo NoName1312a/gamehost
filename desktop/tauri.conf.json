@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "GameHost",
+  "productName": "GameNest",
   "version": "0.4.6",
   "identifier": "com.gamehost.app",
   "build": {

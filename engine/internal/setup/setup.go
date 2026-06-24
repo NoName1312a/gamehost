@@ -162,7 +162,7 @@ func RunAction(id string) (Result, error) {
 			return Result{}, err
 		}
 		return Result{Started: true, NeedsReboot: true,
-			Hint: "Approve the Windows prompt. If asked, restart your PC and reopen GameHost."}, nil
+			Hint: "Approve the Windows prompt. If asked, restart your PC and reopen GameNest."}, nil
 	case ActionInstallDocker:
 		if runtime.GOOS != "windows" {
 			return Result{}, ErrUnsupported

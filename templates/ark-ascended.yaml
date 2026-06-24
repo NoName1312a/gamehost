@@ -31,7 +31,7 @@ env: {}
 variables:
   - key: SESSION_NAME
     label: Server name
-    default: A GameHost ARK server
+    default: A GameNest ARK server
     type: string
     required: false
   - key: SERVER_PASSWORD

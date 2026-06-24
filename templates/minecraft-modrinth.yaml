@@ -4,7 +4,7 @@ game: minecraft
 category: Modded
 description: >-
   Run any Minecraft modpack from Modrinth — paste the modpack's URL or slug and
-  GameHost auto-downloads and installs it (Forge/Fabric/Quilt handled for you).
+  GameNest auto-downloads and installs it (Forge/Fabric/Quilt handled for you).
   No account or API key needed.
 icon: minecraft
 image: itzg/minecraft-server:latest
@@ -43,6 +43,6 @@ variables:
     required: false
   - key: MOTD
     label: Server message (MOTD)
-    default: A GameHost modpack server
+    default: A GameNest modpack server
     type: string
     required: false

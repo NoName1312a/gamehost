@@ -4,7 +4,7 @@ game: minecraft
 category: Modded
 description: >-
   Run any CurseForge modpack (All the Mods, RLCraft, etc.) — paste the modpack
-  page URL plus a free CurseForge API key and GameHost auto-installs it. The key
+  page URL plus a free CurseForge API key and GameNest auto-installs it. The key
   is required by CurseForge for automatic downloads.
 icon: minecraft
 image: itzg/minecraft-server:latest
@@ -43,6 +43,6 @@ variables:
     required: false
   - key: MOTD
     label: Server message (MOTD)
-    default: A GameHost modpack server
+    default: A GameNest modpack server
     type: string
     required: false

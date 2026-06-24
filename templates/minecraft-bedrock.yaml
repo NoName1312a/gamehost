@@ -41,6 +41,6 @@ variables:
     required: true
   - key: SERVER_NAME
     label: Server Name
-    default: GameHost Bedrock
+    default: GameNest Bedrock
     type: string
     required: false
