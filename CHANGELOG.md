@@ -9,6 +9,13 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-06-24
+
+### Changed
+- **Refreshed look.** The app now shares the GameNest website's design — its fonts, the hexagon logo throughout, a subtle background glow, and frosted-glass cards.
+- **New navigation.** A persistent left sidebar (Dashboard, your servers with live status, "+ New server", and quick links) replaces the old hamburger menu.
+- The desktop app is now fully branded **GameNest**, with a matching app icon.
+
 ## [0.4.6] - 2026-06-14
 
 ### Added
