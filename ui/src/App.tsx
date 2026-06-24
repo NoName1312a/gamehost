@@ -84,6 +84,14 @@ function ReadyBanner({ runtime }: { runtime: Async<Runtime> }) {
   );
 }
 
+// ---- view/route model ------------------------------------------------------
+
+type View =
+  | { kind: "dashboard" }
+  | { kind: "server"; id: string }
+  | { kind: "settings" }
+  | { kind: "account" };
+
 // ---- app -------------------------------------------------------------------
 
 export default function App() {
@@ -107,11 +115,9 @@ export default function App() {
   const { servers, refresh } = useServers(health.status === "ok");
 
   const [configureGroup, setConfigureGroup] = useState<GameGroup | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [view, setView] = useState<View>({ kind: "dashboard" });
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showAccount, setShowAccount] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [appVer, setAppVer] = useState<string | null>(null);
@@ -199,7 +205,8 @@ export default function App() {
 
   // The open detail page tracks the live server record from the polled list, so
   // its status/share panels update without re-opening. Closes if it's deleted.
-  const detailServer = detailId ? servers?.find((s) => s.id === detailId) ?? null : null;
+  const activeServerId = view.kind === "server" ? view.id : null;
+  const detailServer = activeServerId ? servers?.find((s) => s.id === activeServerId) ?? null : null;
 
   return (
     <>
@@ -208,16 +215,17 @@ export default function App() {
       <div className="relative z-10 flex h-screen overflow-hidden">
         <Sidebar
           servers={servers}
-          activeServerId={detailId}
+          activeView={view.kind}
+          activeServerId={activeServerId}
           runtimeReady={runtimeReady}
           appVersion={appVer}
           engineVersion={version}
           account={account.status === "ok" ? account.data : undefined}
-          onDashboard={() => setDetailId(null)}
-          onSelectServer={setDetailId}
+          onDashboard={() => setView({ kind: "dashboard" })}
+          onSelectServer={(id) => setView({ kind: "server", id })}
           onNewServer={() => setShowPicker(true)}
-          onOpenSettings={() => setShowSettings(true)}
-          onOpenAccount={() => setShowAccount(true)}
+          onOpenSettings={() => setView({ kind: "settings" })}
+          onOpenAccount={() => setView({ kind: "account" })}
           onWhatsNew={() => setWhatsNew({ title: "What's New", entries: changelogEntries })}
         />
         <main className="flex-1 overflow-y-auto">
@@ -227,7 +235,7 @@ export default function App() {
                 <p className="text-sm text-sky-200">
                   GameNest <span className="font-semibold">v{updateInfo.version}</span> is available.
                 </p>
-                <button onClick={() => setShowSettings(true)} className="rounded-lg bg-sky-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-sky-400">Update</button>
+                <button onClick={() => setView({ kind: "settings" })} className="rounded-lg bg-sky-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-sky-400">Update</button>
               </div>
             )}
             {runtime.status !== "loading" &&
@@ -237,7 +245,7 @@ export default function App() {
               runtimeReady={runtimeReady}
               busy={busy}
               onNewServer={() => setShowPicker(true)}
-              onOpenServer={setDetailId}
+              onOpenServer={(id) => setView({ kind: "server", id })}
               onStart={(id) => action(id, "starting…", () => api.startServer(id))}
               onStop={(id) => action(id, "stopping…", () => api.stopServer(id))}
             />
@@ -266,7 +274,7 @@ export default function App() {
           }}
         />
       )}
-      {detailServer && (
+      {view.kind === "server" && detailServer && (
         <ServerDetail
           key={detailServer.id}
           server={detailServer}
@@ -275,7 +283,7 @@ export default function App() {
           tunnel={tunnel.status === "ok" ? tunnel.data : undefined}
           account={account.status === "ok" ? account.data : undefined}
           busy={busy[detailServer.id]}
-          onClose={() => setDetailId(null)}
+          onClose={() => setView({ kind: "dashboard" })}
           onChanged={() => {
             refresh();
             retry();
@@ -285,19 +293,19 @@ export default function App() {
           onDelete={() => {
             if (confirm(`Delete "${detailServer.name}" and its data? This can't be undone.`)) {
               action(detailServer.id, "deleting…", () => api.deleteServer(detailServer.id));
-              setDetailId(null);
+              setView({ kind: "dashboard" });
             }
           }}
         />
       )}
-      {showSettings && (
+      {view.kind === "settings" && (
         <Settings
           engineVersion={version}
           initialUpdate={updateInfo}
-          onClose={() => setShowSettings(false)}
+          onClose={() => setView({ kind: "dashboard" })}
         />
       )}
-      {showAccount && <Account onClose={() => setShowAccount(false)} />}
+      {view.kind === "account" && <Account onClose={() => setView({ kind: "dashboard" })} />}
       {whatsNew && (
         <Changelog
           title={whatsNew.title}
