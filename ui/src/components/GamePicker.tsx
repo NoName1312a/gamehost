@@ -100,7 +100,7 @@ export function GamePicker({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[70vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl shadow-black/40"
+        className="flex max-h-[70vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/90 shadow-2xl shadow-black/40 backdrop-blur"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >

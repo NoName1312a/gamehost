@@ -182,7 +182,7 @@ export function ConfigureServerModal({
             {group.glyph}
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-zinc-100">New {group.name} server</h2>
+            <h2 className="font-display font-semibold text-zinc-100">New {group.name} server</h2>
             <p className="truncate text-xs text-zinc-500">
               {template && multi ? editionLabel(group, template) : group.blurb}
             </p>
