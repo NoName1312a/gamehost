@@ -61,12 +61,12 @@ export function Changelog({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-6" onClick={onClose}>
       <div
-        className="flex max-h-[calc(100vh-3rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl shadow-black/40"
+        className="flex max-h-[calc(100vh-3rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/90 shadow-2xl shadow-black/40 backdrop-blur"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-zinc-800 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-zinc-100">{title}</h2>
+            <h2 className="font-display text-lg font-semibold text-zinc-100">{title}</h2>
             {subtitle && <p className="mt-0.5 text-sm text-zinc-500">{subtitle}</p>}
           </div>
           <button
@@ -82,9 +82,10 @@ export function Changelog({
           {entries.length === 0 ? (
             <p className="py-8 text-center text-sm text-zinc-500">No changes to show.</p>
           ) : (
-            <div className="space-y-6">
-              {entries.map((e) => (
+            <div>
+              {entries.map((e, idx) => (
                 <section key={e.version}>
+                  {idx > 0 && <div className="divider my-4" />}
                   <div className="flex items-baseline gap-2">
                     <h3 className="font-semibold text-zinc-100">v{e.version}</h3>
                     {e.date && <span className="text-xs text-zinc-500">{e.date}</span>}
