@@ -23,6 +23,7 @@ import { appVersion, checkForUpdate, type UpdateInfo } from "./lib/updater";
 import { friendlyError } from "./lib/errors";
 import { Logo } from "./components/icons";
 import { Dashboard } from "./components/Dashboard";
+import { Account } from "./components/Account";
 
 // ---- tiny async helper -----------------------------------------------------
 
@@ -110,6 +111,7 @@ export default function App() {
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [appVer, setAppVer] = useState<string | null>(null);
@@ -215,6 +217,7 @@ export default function App() {
           onSelectServer={setDetailId}
           onNewServer={() => setShowPicker(true)}
           onOpenSettings={() => setShowSettings(true)}
+          onOpenAccount={() => setShowAccount(true)}
           onWhatsNew={() => setWhatsNew({ title: "What's New", entries: changelogEntries })}
         />
         <main className="flex-1 overflow-y-auto">
@@ -294,6 +297,7 @@ export default function App() {
           onClose={() => setShowSettings(false)}
         />
       )}
+      {showAccount && <Account onClose={() => setShowAccount(false)} />}
       {whatsNew && (
         <Changelog
           title={whatsNew.title}

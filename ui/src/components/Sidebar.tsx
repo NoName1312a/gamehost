@@ -14,7 +14,7 @@ function dotColor(s: ServerSummary): string {
 
 export function Sidebar({
   servers, activeServerId, runtimeReady, appVersion, engineVersion, account,
-  onDashboard, onSelectServer, onNewServer, onOpenSettings, onWhatsNew,
+  onDashboard, onSelectServer, onNewServer, onOpenSettings, onOpenAccount, onWhatsNew,
 }: {
   servers: ServerSummary[] | null;
   activeServerId: string | null;
@@ -26,6 +26,7 @@ export function Sidebar({
   onSelectServer: (id: string) => void;
   onNewServer: () => void;
   onOpenSettings: () => void;
+  onOpenAccount: () => void;
   onWhatsNew: () => void;
 }) {
   const dashboardActive = activeServerId === null;
@@ -86,7 +87,7 @@ export function Sidebar({
       {/* Footer */}
       <div className="mt-2 border-t border-zinc-800/80 px-2 py-2">
         <NavItem onClick={onOpenSettings} label="Settings" icon="&#x2699;" />
-        <NavItem onClick={onOpenSettings} label={account?.linked ? "Account · Plus" : "Account"} icon="&#x25CD;" />
+        <NavItem onClick={onOpenAccount} label={account?.linked ? "Account · Plus" : "Account"} icon="&#x25CD;" />
         <NavItem onClick={onWhatsNew} label="What's New" icon="&#x2726;" />
         <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-zinc-400 transition hover:bg-zinc-800/60 hover:text-zinc-200">GitHub &#x2197;</a>
         <a href={DISCORD_URL} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-zinc-400 transition hover:bg-zinc-800/60 hover:text-zinc-200">Discord &#x2197;</a>
