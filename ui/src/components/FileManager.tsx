@@ -16,7 +16,7 @@ const primaryBtn =
 // FileManager browses and edits a server's data volume (configs, mods, worlds)
 // through the engine's docker-backed file API. Works whether the server is
 // running or stopped.
-export function FileManager({ server, onClose }: { server: ServerSummary; onClose: () => void }) {
+export function FileManager({ server }: { server: ServerSummary }) {
   const [path, setPath] = useState("");
   const [entries, setEntries] = useState<FileEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -106,12 +106,9 @@ export function FileManager({ server, onClose }: { server: ServerSummary; onClos
     : [];
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950">
+    <div className="flex h-full flex-col bg-zinc-950">
       <header className="flex items-center justify-between gap-3 border-b border-zinc-800 px-6 py-3">
         <div className="flex items-center gap-3">
-          <button onClick={onClose} className="rounded-lg px-2 py-1 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200">
-            ← Back
-          </button>
           <h2 className="font-semibold text-zinc-100">Files — {server.name}</h2>
         </div>
         <div className="flex items-center gap-2">

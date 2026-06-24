@@ -228,28 +228,54 @@ export default function App() {
           onOpenAccount={() => setView({ kind: "account" })}
           onWhatsNew={() => setWhatsNew({ title: "What's New", entries: changelogEntries })}
         />
-        <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-5xl">
-            {updateInfo && (
-              <div className="mx-6 mt-6 flex items-center justify-between gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3">
-                <p className="text-sm text-sky-200">
-                  GameNest <span className="font-semibold">v{updateInfo.version}</span> is available.
-                </p>
-                <button onClick={() => setView({ kind: "settings" })} className="rounded-lg bg-sky-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-sky-400">Update</button>
-              </div>
-            )}
-            {runtime.status !== "loading" &&
-              (runtimeReady ? <ReadyBanner runtime={runtime} /> : <SetupWizard setup={setup} onRecheck={retry} />)}
-            <Dashboard
-              servers={servers}
-              runtimeReady={runtimeReady}
-              busy={busy}
-              onNewServer={() => setShowPicker(true)}
-              onOpenServer={(id) => setView({ kind: "server", id })}
-              onStart={(id) => action(id, "starting…", () => api.startServer(id))}
-              onStop={(id) => action(id, "stopping…", () => api.stopServer(id))}
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {view.kind === "server" && detailServer ? (
+            <ServerDetail
+              key={detailServer.id}
+              server={detailServer}
+              template={templates.status === "ok" ? templates.data.find((t) => t.id === detailServer.templateId) : undefined}
+              relay={relay.status === "ok" ? relay.data : undefined}
+              tunnel={tunnel.status === "ok" ? tunnel.data : undefined}
+              account={account.status === "ok" ? account.data : undefined}
+              busy={busy[detailServer.id]}
+              onChanged={() => {
+                refresh();
+                retry();
+              }}
+              onStart={() => action(detailServer.id, "starting…", () => api.startServer(detailServer.id))}
+              onStop={() => action(detailServer.id, "stopping…", () => api.stopServer(detailServer.id))}
+              onDelete={() => {
+                if (confirm(`Delete "${detailServer.name}" and its data? This can't be undone.`)) {
+                  action(detailServer.id, "deleting…", () => api.deleteServer(detailServer.id));
+                  setView({ kind: "dashboard" });
+                }
+              }}
             />
-          </div>
+          ) : (
+            <div className="h-full overflow-y-auto">
+              <div className="mx-auto max-w-5xl">
+                {updateInfo && (
+                  <div className="mx-6 mt-6 flex items-center justify-between gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3">
+                    <p className="text-sm text-sky-200">
+                      GameNest <span className="font-semibold">v{updateInfo.version}</span> is available.
+                    </p>
+                    <button onClick={() => setView({ kind: "settings" })} className="rounded-lg bg-sky-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-sky-400">Update</button>
+                  </div>
+                )}
+                {runtime.status !== "loading" &&
+                  (runtimeReady ? <ReadyBanner runtime={runtime} /> : <SetupWizard setup={setup} onRecheck={retry} />)}
+                <Dashboard
+                  servers={servers}
+                  runtimeReady={runtimeReady}
+                  busy={busy}
+                  onNewServer={() => setShowPicker(true)}
+                  onOpenServer={(id) => setView({ kind: "server", id })}
+                  onStart={(id) => action(id, "starting…", () => api.startServer(id))}
+                  onStop={(id) => action(id, "stopping…", () => api.stopServer(id))}
+                />
+              </div>
+            </div>
+          )}
         </main>
       </div>
 
@@ -271,30 +297,6 @@ export default function App() {
           onCreated={() => {
             setConfigureGroup(null);
             refresh();
-          }}
-        />
-      )}
-      {view.kind === "server" && detailServer && (
-        <ServerDetail
-          key={detailServer.id}
-          server={detailServer}
-          template={templates.status === "ok" ? templates.data.find((t) => t.id === detailServer.templateId) : undefined}
-          relay={relay.status === "ok" ? relay.data : undefined}
-          tunnel={tunnel.status === "ok" ? tunnel.data : undefined}
-          account={account.status === "ok" ? account.data : undefined}
-          busy={busy[detailServer.id]}
-          onClose={() => setView({ kind: "dashboard" })}
-          onChanged={() => {
-            refresh();
-            retry();
-          }}
-          onStart={() => action(detailServer.id, "starting…", () => api.startServer(detailServer.id))}
-          onStop={() => action(detailServer.id, "stopping…", () => api.stopServer(detailServer.id))}
-          onDelete={() => {
-            if (confirm(`Delete "${detailServer.name}" and its data? This can't be undone.`)) {
-              action(detailServer.id, "deleting…", () => api.deleteServer(detailServer.id));
-              setView({ kind: "dashboard" });
-            }
           }}
         />
       )}

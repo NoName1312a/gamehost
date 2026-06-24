@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, type ServerSummary } from "../lib/api";
 
-export function ServerConsole({
-  server,
-  onClose,
-}: {
-  server: ServerSummary;
-  onClose: () => void;
-}) {
+export function ServerConsole({ server }: { server: ServerSummary }) {
   const [lines, setLines] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
   const [input, setInput] = useState("");
@@ -44,15 +38,9 @@ export function ServerConsole({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950">
+    <div className="flex h-full flex-col bg-zinc-950">
       <header className="flex items-center justify-between border-b border-zinc-800 px-6 py-3">
         <div className="flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-          >
-            ← Back
-          </button>
           <h2 className="font-semibold text-zinc-100">{server.name}</h2>
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs ${

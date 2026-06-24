@@ -22,6 +22,8 @@ const primaryBtn =
 const ghostBtn =
   "rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50";
 
+type Tab = "overview" | "console" | "files" | "settings" | "backups" | "mods";
+
 function statusStyle(status: string): string {
   if (status === "running") return "text-emerald-400 bg-emerald-400/10 ring-emerald-400/20";
   if (status === "exited" || status === "created") return "text-amber-400 bg-amber-400/10 ring-amber-400/20";
@@ -772,7 +774,6 @@ export function ServerDetail({
   tunnel,
   account,
   busy,
-  onClose,
   onChanged,
   onStart,
   onStop,
@@ -784,7 +785,6 @@ export function ServerDetail({
   tunnel?: TunnelStatus;
   account?: AccountStatus;
   busy?: string;
-  onClose: () => void;
   onChanged: () => void;
   onStart: () => void;
   onStop: () => void;
@@ -807,8 +807,16 @@ export function ServerDetail({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [showConsole, setShowConsole] = useState(false);
-  const [showFiles, setShowFiles] = useState(false);
+  const [tab, setTab] = useState<Tab>("overview");
+  const showMods = template?.runtime === "java";
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "console", label: "Console" },
+    { id: "files", label: "Files" },
+    { id: "settings", label: "Settings" },
+    { id: "backups", label: "Backups" },
+    ...(showMods ? [{ id: "mods" as Tab, label: "Mods" }] : []),
+  ];
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -834,199 +842,214 @@ export function ServerDetail({
   const meta = gameMetaFor(server.game, server.name);
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-zinc-950">
-      <header className="flex items-center justify-between border-b border-zinc-800 px-6 py-3">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-          >
-            ← Back
-          </button>
-          <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br ${meta.gradient} text-base`}>
+    <div className="flex h-full flex-col">
+      {/* Sticky header: icon · name · status · Start/Stop */}
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-zinc-800/80 bg-zinc-950/70 px-6 py-3 backdrop-blur">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br ${meta.gradient} text-base`}>
             {meta.glyph}
           </div>
-          <h2 className="font-semibold text-zinc-100">{server.name}</h2>
+          <div className="min-w-0">
+            <h2 className="truncate font-display text-lg font-semibold text-zinc-100">{server.name}</h2>
+            <p className="text-xs text-zinc-600">{server.game}</p>
+          </div>
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${statusStyle(server.status)}`}
           >
             {status}
           </span>
         </div>
-        <span className="text-xs text-zinc-600">{server.game}</span>
-      </header>
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl space-y-5 px-6 py-6">
-          {server.pulling && (
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-              <p className="text-sm text-emerald-200">First start — downloading game files… {server.pullPercent ?? 0}%</p>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-                <div
-                  className="h-full rounded-full bg-emerald-500 transition-all"
-                  style={{ width: `${server.pullPercent ?? 0}%` }}
-                />
-              </div>
-              {server.pullStatus && <p className="mt-1 text-xs text-emerald-300/70">{server.pullStatus}</p>}
-            </div>
-          )}
-
-          {/* Actions */}
-          <section className="flex flex-wrap items-center gap-2">
-            {server.running ? (
-              <button onClick={onStop} disabled={!!busy} className={ghostBtn}>
-                Stop
-              </button>
-            ) : (
-              <button onClick={onStart} disabled={!!busy} className={primaryBtn}>
-                Start
-              </button>
-            )}
-            <button onClick={() => setShowConsole(true)} className={ghostBtn}>
-              Open console
-            </button>
-            <button onClick={() => setShowFiles(true)} className={ghostBtn}>
-              Files
-            </button>
-            <button
-              onClick={onDelete}
-              disabled={!!busy}
-              className="ml-auto rounded-lg border border-rose-500/30 px-3 py-1.5 text-sm text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
-            >
-              Delete server
-            </button>
-          </section>
-
-          {/* Connection / share online */}
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-              Connection &amp; sharing
-            </h3>
-            <ConnectionPanel s={server} relay={relay} tunnel={tunnel} account={account} onChanged={onChanged} />
-          </section>
-
-          {/* Resources */}
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Resources</h3>
-            <ResourcesPanel s={server} />
-          </section>
-
-          {/* Settings */}
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Settings</h3>
-            <form onSubmit={save} className="space-y-4">
-              <div>
-                <label htmlFor="sd-name" className={label}>Server name</label>
-                <input id="sd-name" className={field} value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="sd-port" className={label}>Host port</label>
-                  <input
-                    id="sd-port"
-                    className={field}
-                    type="number"
-                    value={port}
-                    onChange={(e) => setPort(Number(e.target.value))}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="sd-memory" className={label}>Memory (MB)</label>
-                  <input
-                    id="sd-memory"
-                    className={field}
-                    type="number"
-                    value={memory}
-                    onChange={(e) => setMemory(Number(e.target.value))}
-                    min={template?.minMemoryMB}
-                  />
-                </div>
-              </div>
-
-              {variables.map((v) => (
-                <div key={v.key}>
-                  <label htmlFor={`sd-${v.key}`} className={label}>
-                    {v.label}
-                    {v.required && <span className="text-rose-400"> *</span>}
-                  </label>
-                  {v.type === "enum" && v.options ? (
-                    <select
-                      id={`sd-${v.key}`}
-                      className={field}
-                      value={vars[v.key] ?? ""}
-                      onChange={(e) => setVars((s) => ({ ...s, [v.key]: e.target.value }))}
-                    >
-                      {v.options.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      id={`sd-${v.key}`}
-                      className={field}
-                      value={vars[v.key] ?? ""}
-                      onChange={(e) => setVars((s) => ({ ...s, [v.key]: e.target.value }))}
-                    />
-                  )}
-                  {v.description && <p className="mt-1 text-xs text-zinc-600">{v.description}</p>}
-                </div>
-              ))}
-
-              {!template && (
-                <p className="text-xs text-amber-400/80">
-                  This server's game template isn't loaded, so game-specific options can't be shown — name, port,
-                  and memory are still editable.
-                </p>
-              )}
-
-              {server.running && (
-                <p className="text-xs text-amber-400/80">
-                  Saving will restart the server to apply changes. Your saved world/config data is kept.
-                </p>
-              )}
-
-              {saveError && (
-                <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
-                  {saveError}
-                </p>
-              )}
-
-              <div className="flex items-center gap-3">
-                <button type="submit" disabled={saving} className={primaryBtn}>
-                  {saving ? "Saving…" : "Save changes"}
-                </button>
-                {saved && <span className="text-sm text-emerald-400">Saved ✓</span>}
-              </div>
-            </form>
-          </section>
-
-          {/* Backups */}
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Backups</h3>
-            <BackupsPanel s={server} />
-          </section>
-
-          {/* Schedules */}
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Schedules</h3>
-            <SchedulesPanel s={server} onChanged={onChanged} />
-          </section>
-
-          {/* Mods (Minecraft) */}
-          {template?.runtime === "java" && (
-            <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5">
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">Mods &amp; plugins</h3>
-              <ModsPanel s={server} onChanged={onChanged} />
-            </section>
+        <div className="flex shrink-0 items-center gap-2">
+          {server.running ? (
+            <button onClick={onStop} disabled={!!busy} className={ghostBtn}>Stop</button>
+          ) : (
+            <button onClick={onStart} disabled={!!busy} className={primaryBtn}>Start</button>
           )}
         </div>
-      </div>
+      </header>
 
-      {showConsole && <ServerConsole server={server} onClose={() => setShowConsole(false)} />}
-      {showFiles && <FileManager server={server} onClose={() => setShowFiles(false)} />}
+      {/* Tab bar */}
+      <nav className="flex shrink-0 items-center gap-1 border-b border-zinc-800/80 px-4">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`relative px-3 py-2.5 text-sm font-medium transition ${
+              tab === t.id ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            {t.label}
+            {tab === t.id && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-emerald-400" />}
+          </button>
+        ))}
+      </nav>
+
+      {/* Tab content */}
+      <div className="min-h-0 flex-1">
+        {tab === "overview" && (
+          <div className="h-full overflow-y-auto px-6 py-6">
+            <div className="mx-auto max-w-3xl space-y-5">
+              {server.pulling && (
+                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+                  <p className="text-sm text-emerald-200">First start — downloading game files… {server.pullPercent ?? 0}%</p>
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all"
+                      style={{ width: `${server.pullPercent ?? 0}%` }}
+                    />
+                  </div>
+                  {server.pullStatus && <p className="mt-1 text-xs text-emerald-300/70">{server.pullStatus}</p>}
+                </div>
+              )}
+              <section className="panel p-5">
+                <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-zinc-400">Connection &amp; sharing</h3>
+                <ConnectionPanel s={server} relay={relay} tunnel={tunnel} account={account} onChanged={onChanged} />
+              </section>
+              <section className="panel p-5">
+                <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-zinc-400">Resources</h3>
+                <ResourcesPanel s={server} />
+              </section>
+            </div>
+          </div>
+        )}
+
+        {tab === "console" && <ServerConsole server={server} />}
+        {tab === "files" && <FileManager server={server} />}
+
+        {tab === "settings" && (
+          <div className="h-full overflow-y-auto px-6 py-6">
+            <div className="mx-auto max-w-3xl space-y-5">
+              <section className="panel p-5">
+                <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-zinc-400">Server settings</h3>
+                <form onSubmit={save} className="space-y-4">
+                  <div>
+                    <label htmlFor="sd-name" className={label}>Server name</label>
+                    <input id="sd-name" className={field} value={name} onChange={(e) => setName(e.target.value)} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="sd-port" className={label}>Host port</label>
+                      <input
+                        id="sd-port"
+                        className={field}
+                        type="number"
+                        value={port}
+                        onChange={(e) => setPort(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="sd-memory" className={label}>Memory (MB)</label>
+                      <input
+                        id="sd-memory"
+                        className={field}
+                        type="number"
+                        value={memory}
+                        onChange={(e) => setMemory(Number(e.target.value))}
+                        min={template?.minMemoryMB}
+                      />
+                    </div>
+                  </div>
+
+                  {variables.map((v) => (
+                    <div key={v.key}>
+                      <label htmlFor={`sd-${v.key}`} className={label}>
+                        {v.label}
+                        {v.required && <span className="text-rose-400"> *</span>}
+                      </label>
+                      {v.type === "enum" && v.options ? (
+                        <select
+                          id={`sd-${v.key}`}
+                          className={field}
+                          value={vars[v.key] ?? ""}
+                          onChange={(e) => setVars((s) => ({ ...s, [v.key]: e.target.value }))}
+                        >
+                          {v.options.map((o) => (
+                            <option key={o} value={o}>
+                              {o}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          id={`sd-${v.key}`}
+                          className={field}
+                          value={vars[v.key] ?? ""}
+                          onChange={(e) => setVars((s) => ({ ...s, [v.key]: e.target.value }))}
+                        />
+                      )}
+                      {v.description && <p className="mt-1 text-xs text-zinc-600">{v.description}</p>}
+                    </div>
+                  ))}
+
+                  {!template && (
+                    <p className="text-xs text-amber-400/80">
+                      This server's game template isn't loaded, so game-specific options can't be shown — name, port,
+                      and memory are still editable.
+                    </p>
+                  )}
+
+                  {server.running && (
+                    <p className="text-xs text-amber-400/80">
+                      Saving will restart the server to apply changes. Your saved world/config data is kept.
+                    </p>
+                  )}
+
+                  {saveError && (
+                    <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+                      {saveError}
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    <button type="submit" disabled={saving} className={primaryBtn}>
+                      {saving ? "Saving…" : "Save changes"}
+                    </button>
+                    {saved && <span className="text-sm text-emerald-400">Saved ✓</span>}
+                  </div>
+                </form>
+              </section>
+              <section className="panel p-5">
+                <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-rose-300">Danger zone</h3>
+                <p className="mb-3 text-sm text-zinc-400">Permanently delete this server and all of its data. This can't be undone.</p>
+                <button
+                  onClick={onDelete}
+                  disabled={!!busy}
+                  className="rounded-lg border border-rose-500/30 px-3 py-1.5 text-sm text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
+                >
+                  Delete server
+                </button>
+              </section>
+            </div>
+          </div>
+        )}
+
+        {tab === "backups" && (
+          <div className="h-full overflow-y-auto px-6 py-6">
+            <div className="mx-auto max-w-3xl space-y-5">
+              <section className="panel p-5">
+                <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-zinc-400">Backups</h3>
+                <BackupsPanel s={server} />
+              </section>
+              <section className="panel p-5">
+                <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-zinc-400">Schedules</h3>
+                <SchedulesPanel s={server} onChanged={onChanged} />
+              </section>
+            </div>
+          </div>
+        )}
+
+        {tab === "mods" && showMods && (
+          <div className="h-full overflow-y-auto px-6 py-6">
+            <div className="mx-auto max-w-3xl space-y-5">
+              <section className="panel p-5">
+                <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-zinc-400">Mods &amp; plugins</h3>
+                <ModsPanel s={server} onChanged={onChanged} />
+              </section>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
