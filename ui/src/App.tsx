@@ -16,7 +16,7 @@ import { groupGames, type GameGroup } from "./lib/games";
 import { ServerDetail } from "./components/ServerDetail";
 import { SetupWizard } from "./components/SetupWizard";
 import { Settings } from "./components/Settings";
-import { Menu } from "./components/Menu";
+import { Sidebar } from "./components/Sidebar";
 import { Changelog } from "./components/Changelog";
 import { changelog as changelogEntries, entriesSince, type ChangelogEntry } from "./lib/changelog";
 import { appVersion, checkForUpdate, type UpdateInfo } from "./lib/updater";
@@ -68,30 +68,6 @@ function useServers(enabled: boolean) {
   return { servers, refresh: load };
 }
 
-// ---- sections --------------------------------------------------------------
-
-function Header({ onMenu }: { onMenu: () => void }) {
-  return (
-    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-zinc-800/80 bg-zinc-950/80 px-4 py-3.5 backdrop-blur sm:px-6">
-      <button
-        onClick={onMenu}
-        title="Menu"
-        aria-label="Open menu"
-        className="grid h-9 w-9 place-items-center rounded-xl text-zinc-300 ring-1 ring-inset ring-zinc-800 transition hover:bg-zinc-800/60 hover:text-zinc-100"
-      >
-        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
-      <Logo className="h-9 w-9 text-emerald-400" />
-      <div>
-        <h1 className="font-display text-base font-semibold leading-none text-zinc-100">GameNest</h1>
-        <p className="mt-0.5 text-xs text-zinc-500">Self-host game servers, simply</p>
-      </div>
-    </header>
-  );
-}
-
 // ReadyBanner is shown once Docker is reachable; the guided SetupWizard handles
 // the not-yet-ready case.
 function ReadyBanner({ runtime }: { runtime: Async<Runtime> }) {
@@ -136,7 +112,6 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [appVer, setAppVer] = useState<string | null>(null);
   const [whatsNew, setWhatsNew] = useState<{ title: string; subtitle?: string; entries: ChangelogEntry[] } | null>(null);
 
@@ -228,39 +203,46 @@ export default function App() {
     <>
       <div className="bg-glow" aria-hidden />
       <div className="grain" aria-hidden />
-      <div className="relative z-10 mx-auto min-h-screen max-w-6xl">
-      <Header onMenu={() => setMenuOpen(true)} />
-      {updateInfo && (
-        <div className="mx-6 mt-6 flex items-center justify-between gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3">
-          <p className="text-sm text-sky-200">
-            GameNest <span className="font-semibold">v{updateInfo.version}</span> is available.
-          </p>
-          <button
-            onClick={() => setShowSettings(true)}
-            className="rounded-lg bg-sky-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-sky-400"
-          >
-            Update
-          </button>
-        </div>
-      )}
-      {runtime.status !== "loading" &&
-        (runtimeReady ? (
-          <ReadyBanner runtime={runtime} />
-        ) : (
-          <SetupWizard setup={setup} onRecheck={retry} />
-        ))}
+      <div className="relative z-10 flex h-screen overflow-hidden">
+        <Sidebar
+          servers={servers}
+          activeServerId={detailId}
+          runtimeReady={runtimeReady}
+          appVersion={appVer}
+          engineVersion={version}
+          account={account.status === "ok" ? account.data : undefined}
+          onDashboard={() => setDetailId(null)}
+          onSelectServer={setDetailId}
+          onNewServer={() => setShowPicker(true)}
+          onOpenSettings={() => setShowSettings(true)}
+          onWhatsNew={() => setWhatsNew({ title: "What's New", entries: changelogEntries })}
+        />
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-5xl">
+            {updateInfo && (
+              <div className="mx-6 mt-6 flex items-center justify-between gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3">
+                <p className="text-sm text-sky-200">
+                  GameNest <span className="font-semibold">v{updateInfo.version}</span> is available.
+                </p>
+                <button onClick={() => setShowSettings(true)} className="rounded-lg bg-sky-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-sky-400">Update</button>
+              </div>
+            )}
+            {runtime.status !== "loading" &&
+              (runtimeReady ? <ReadyBanner runtime={runtime} /> : <SetupWizard setup={setup} onRecheck={retry} />)}
+            <Dashboard
+              servers={servers}
+              runtimeReady={runtimeReady}
+              busy={busy}
+              onNewServer={() => setShowPicker(true)}
+              onOpenServer={setDetailId}
+              onStart={(id) => action(id, "starting…", () => api.startServer(id))}
+              onStop={(id) => action(id, "stopping…", () => api.stopServer(id))}
+            />
+          </div>
+        </main>
+      </div>
 
-      <Dashboard
-        servers={servers}
-        runtimeReady={runtimeReady}
-        busy={busy}
-        onNewServer={() => setShowPicker(true)}
-        onOpenServer={setDetailId}
-        onStart={(id) => action(id, "starting…", () => api.startServer(id))}
-        onStop={(id) => action(id, "stopping…", () => api.stopServer(id))}
-      />
-
-      {/* Overlays */}
+      {/* Overlays — unchanged, still launched via the state flags */}
       {showPicker && templates.status === "ok" && (
         <GamePicker
           groups={groupGames(templates.data)}
@@ -312,21 +294,6 @@ export default function App() {
           onClose={() => setShowSettings(false)}
         />
       )}
-      {menuOpen && (
-        <Menu
-          appVersion={appVer}
-          engineVersion={version}
-          onSettings={() => {
-            setMenuOpen(false);
-            setShowSettings(true);
-          }}
-          onWhatsNew={() => {
-            setMenuOpen(false);
-            setWhatsNew({ title: "What's New", entries: changelogEntries });
-          }}
-          onClose={() => setMenuOpen(false)}
-        />
-      )}
       {whatsNew && (
         <Changelog
           title={whatsNew.title}
@@ -337,14 +304,13 @@ export default function App() {
       )}
 
       {toast && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-lg border border-rose-500/30 bg-rose-500/15 px-4 py-2 text-sm text-rose-200 shadow-lg">
+        <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-rose-500/30 bg-rose-500/15 px-4 py-2 text-sm text-rose-200 shadow-lg">
           {toast}
           <button onClick={() => setToast(null)} className="ml-3 text-rose-400 hover:text-rose-200">
             ✕
           </button>
         </div>
       )}
-    </div>
     </>
   );
 }
