@@ -9,6 +9,11 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-06-24
+
+### Added
+- A dedicated **Account** screen (sidebar → Account) for GameNest Plus sign-in and status, separate from Settings.
+
 ## [0.4.7] - 2026-06-24
 
 ### Changed
