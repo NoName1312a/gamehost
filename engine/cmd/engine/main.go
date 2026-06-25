@@ -49,11 +49,11 @@ func main() {
 	netMapper := network.New()
 	relayAgent := relay.New(cfg.DataDir)
 
-	// The built-in GameNest tunnel is dormant unless a control-plane URL is set
-	// (GAMEHOST_TUNNEL_URL). When unset, no agent is created and the tunnel
-	// routes report "not configured".
+	// The built-in GameNest tunnel is on by default (baked relay URL). Set
+	// GAMEHOST_TUNNEL_DISABLE=1 to force it off, or GAMEHOST_TUNNEL_URL to
+	// override the relay control-plane address.
 	var tunAgent *tunnel.Agent
-	if url := os.Getenv("GAMEHOST_TUNNEL_URL"); url != "" {
+	if url := resolveTunnelURL(os.Getenv); url != "" {
 		tunAgent = tunnel.New(cfg.DataDir, url)
 	}
 
