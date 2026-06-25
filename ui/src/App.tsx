@@ -24,6 +24,7 @@ import { friendlyError } from "./lib/errors";
 import { Logo } from "./components/icons";
 import { Dashboard } from "./components/Dashboard";
 import { Account } from "./components/Account";
+import { GetStartedChecklist } from "./components/GetStartedChecklist";
 
 // ---- tiny async helper -----------------------------------------------------
 
@@ -122,6 +123,9 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [appVer, setAppVer] = useState<string | null>(null);
   const [whatsNew, setWhatsNew] = useState<{ title: string; subtitle?: string; entries: ChangelogEntry[] } | null>(null);
+  const [invitedFriend, setInvitedFriend] = useState<boolean>(
+    () => localStorage.getItem("gamenest.invitedFriend") === "true",
+  );
 
   // Auth gate: loopback (desktop) is always authenticated, so this only ever
   // shows a login for remote browsers. null = unknown (don't gate yet).
@@ -203,6 +207,11 @@ export default function App() {
   const version = health.status === "ok" ? health.data.version : undefined;
   const runtimeReady = runtime.status === "ok" && runtime.data.connected;
 
+  function markInvited() {
+    localStorage.setItem("gamenest.invitedFriend", "true");
+    setInvitedFriend(true);
+  }
+
   // The open detail page tracks the live server record from the polled list, so
   // its status/share panels update without re-opening. Closes if it's deleted.
   const activeServerId = view.kind === "server" ? view.id : null;
@@ -268,6 +277,13 @@ export default function App() {
                 )}
                 {runtime.status !== "loading" &&
                   (runtimeReady ? <ReadyBanner runtime={runtime} /> : <SetupWizard setup={setup} onRecheck={retry} />)}
+                <GetStartedChecklist
+                  runtimeReady={runtimeReady}
+                  servers={servers}
+                  invitedFriend={invitedFriend}
+                  onNewServer={() => setShowPicker(true)}
+                  onInvite={() => { markInvited(); if (servers && servers[0]) setView({ kind: "server", id: servers[0].id }); }}
+                />
                 <Dashboard
                   servers={servers}
                   runtimeReady={runtimeReady}
