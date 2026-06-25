@@ -6,7 +6,6 @@ import {
   type BackupInfo,
   type Connectivity,
   type Reachable,
-  type Relay,
   type ServerSummary,
   type Stats,
   type Template,
@@ -31,7 +30,7 @@ function statusStyle(status: string): string {
   return "text-sky-400 bg-sky-400/10 ring-sky-400/20";
 }
 
-// ---- sharing (playit.gg relay) ---------------------------------------------
+// ---- sharing (direct-first, GameNest tunnel fallback) ----------------------
 
 function CopyRow({ label, addr, pill }: { label: string; addr: string; pill: ReactNode }) {
   const [copied, setCopied] = useState(false);
@@ -68,11 +67,6 @@ const forwardedPill = (
     auto-forwarded
   </span>
 );
-const relayPill = (
-  <span className="rounded-full bg-sky-400/10 px-2 py-0.5 text-[11px] text-sky-300 ring-1 ring-inset ring-sky-400/20">
-    via relay
-  </span>
-);
 const reachablePill = (
   <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] text-emerald-300 ring-1 ring-inset ring-emerald-400/20">
     reachable ✓
@@ -84,141 +78,19 @@ const tunnelPill = (
   </span>
 );
 
-// RelaySetup guides the playit relay fallback: install -> link account -> open
-// dashboard to create a tunnel -> paste the address.
-function RelaySetup({
-  s,
-  relay,
-  port,
-  proto,
-  onChanged,
-}: {
-  s: ServerSummary;
-  relay?: Relay;
-  port?: number;
-  proto: string;
-  onChanged: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [addr, setAddr] = useState("");
-  const [secret, setSecret] = useState("");
-
-  async function act(action: string) {
-    setBusy(true);
-    try {
-      await api.relayAction(action);
-    } catch {
-      /* surfaced via status re-poll */
-    } finally {
-      setBusy(false);
-      onChanged();
-    }
-  }
-  async function link() {
-    if (!secret.trim()) return;
-    setBusy(true);
-    try {
-      await api.relayLink(secret.trim());
-    } catch {
-      /* surfaced via status re-poll */
-    } finally {
-      setBusy(false);
-      setSecret("");
-      onChanged();
-    }
-  }
-  async function save() {
-    if (!addr.trim()) return;
-    setBusy(true);
-    try {
-      await api.setRelayAddress(s.id, addr.trim());
-    } finally {
-      setBusy(false);
-      onChanged();
-    }
-  }
-
-  return (
-    <div className="space-y-2">
-      <p className="text-xs text-zinc-400">
-        This server isn't auto-forwarded. Use a free playit.gg relay so friends can connect without router setup
-        {port ? ` — or forward port ${port} (${proto}) in your router.` : "."}
-      </p>
-
-      {!relay?.installed && (
-        <button disabled={busy} onClick={() => act("install")} className={primaryBtn}>
-          {busy ? "Installing…" : "Install playit relay"}
-        </button>
-      )}
-
-      {relay?.installed && !relay.linked && (
-        <div className="space-y-2">
-          <button disabled={busy} onClick={() => act("open-setup")} className={ghostBtn}>
-            1. Get a secret key from playit.gg →
-          </button>
-          <div className="flex gap-2">
-            <input
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-              placeholder="2. paste your playit secret key"
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-emerald-500"
-            />
-            <button disabled={busy || !secret.trim()} onClick={link} className={primaryBtn}>
-              {busy ? "Linking…" : "Link"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {relay?.installed && relay.linked && (
-        <div className="space-y-2">
-          <button disabled={busy} onClick={() => act("open-dashboard")} className={ghostBtn}>
-            Open playit dashboard → create a tunnel
-          </button>
-          <div className="flex gap-2">
-            <input
-              value={addr}
-              onChange={(e) => setAddr(e.target.value)}
-              placeholder="paste your playit address, e.g. name.playit.gg:35211"
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-emerald-500"
-            />
-            <button disabled={busy || !addr.trim()} onClick={save} className={primaryBtn}>
-              Save
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// TunnelShare is the built-in GameNest tunnel: one click provisions a public
-// <slug>.gn.coderaum.com address with no router setup, no account, and no extra
-// app — the recommended sharing path when the tunnel feature is configured. It
-// supersedes the playit RelaySetup (kept as an advanced fallback).
-function TunnelShare({ s, account, onChanged }: { s: ServerSummary; account?: AccountStatus; onChanged: () => void }) {
-  const [busy, setBusy] = useState(false);
+// Plus-only: a reserved vanity address. Dormant until GameNest Plus (Stage C);
+// shown only when an account is configured + linked.
+function VanityControl({ s, account, onChanged }: { s: ServerSummary; account?: AccountStatus; onChanged: () => void }) {
   const [vanityName, setVanityName] = useState("");
   const [vanityBusy, setVanityBusy] = useState(false);
   const [vanityError, setVanityError] = useState<string | null>(null);
-
-  async function toggle(on: boolean) {
-    setBusy(true);
-    try {
-      await api.setUseTunnel(s.id, on);
-    } finally {
-      setBusy(false);
-      onChanged();
-    }
-  }
-
+  const plusLinked = account?.configured && account?.linked;
+  if (!plusLinked) return null;
   async function applyVanity() {
-    if (!vanityName.trim()) return;
     setVanityBusy(true);
     setVanityError(null);
     try {
       await api.setVanity(s.id, vanityName.trim());
-      setVanityName("");
       onChanged();
     } catch (e) {
       setVanityError(friendlyError(e));
@@ -226,95 +98,61 @@ function TunnelShare({ s, account, onChanged }: { s: ServerSummary; account?: Ac
       setVanityBusy(false);
     }
   }
-
-  const plusLinked = account?.configured && account?.linked;
-
-  if (!s.useTunnel) {
-    return (
-      <div className="space-y-1">
-        <button disabled={busy} onClick={() => toggle(true)} className={primaryBtn}>
-          {busy ? "Enabling…" : "Share with friends (no setup)"}
-        </button>
-        <p className="text-xs text-zinc-500">
-          Get a public address through GameNest's relay — no port-forwarding, no account, no extra app.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-1">
-      {s.tunnelAddress ? (
-        <CopyRow label="Friends connect to" addr={s.tunnelAddress} pill={tunnelPill} />
-      ) : (
-        <p className="text-xs text-zinc-400">
-          {s.running ? "Setting up your public address…" : "Starts sharing once the server is running."}
-        </p>
-      )}
-      {/* Vanity name control — only when Plus account is linked */}
-      {plusLinked && (
-        <div className="mt-2 space-y-1 border-t border-zinc-800 pt-2">
-          <p className="text-[11px] text-zinc-500">Use my GameNest name</p>
-          <div className="flex gap-2">
-            <input
-              value={vanityName}
-              onChange={(e) => setVanityName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyVanity(); } }}
-              placeholder={s.tunnelSlug ?? "your-name"}
-              className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 font-mono text-xs text-zinc-100 outline-none focus:border-emerald-500"
-            />
-            <button
-              onClick={applyVanity}
-              disabled={vanityBusy || !vanityName.trim()}
-              className="shrink-0 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
-            >
-              {vanityBusy ? "…" : "Set"}
-            </button>
-          </div>
-          {vanityError && <p className="text-[11px] text-rose-400">{vanityError}</p>}
-        </div>
-      )}
-      <button
-        onClick={() => toggle(false)}
-        disabled={busy}
-        className="text-[11px] text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline disabled:opacity-50"
-      >
-        stop sharing
-      </button>
+    <div className="mt-2">
+      <label className="text-[11px] uppercase tracking-wide text-zinc-500">Reserved address (Plus)</label>
+      <div className="mt-1 flex items-center gap-2">
+        <input
+          value={vanityName}
+          onChange={(e) => setVanityName(e.target.value)}
+          placeholder={s.tunnelSlug ?? "your-name"}
+          className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 font-mono text-xs text-zinc-100 outline-none focus:border-emerald-500"
+        />
+        <button onClick={applyVanity} disabled={vanityBusy || !vanityName.trim()} className="shrink-0 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50">
+          {vanityBusy ? "…" : "Set"}
+        </button>
+      </div>
+      {vanityError && <p className="mt-1 text-xs text-rose-400">{vanityError}</p>}
     </div>
   );
 }
 
-// ConnectionPanel implements "direct-first": it shows whether the port was
-// auto-forwarded (friends connect directly — nothing extra running), guides a
-// one-time manual forward when the router blocks UPnP, lets the user verify
-// reachability from the internet, and offers the playit relay as the
-// no-router-access fallback.
-function ConnectionPanel({ s, relay, tunnel, account, onChanged }: { s: ServerSummary; relay?: Relay; tunnel?: TunnelStatus; account?: AccountStatus; onChanged: () => void }) {
+// ConnectionPanel implements "direct-first": friends connect directly when the
+// port is auto-forwarded (nothing extra running). When direct hosting fails
+// (no UPnP forward, or forwarded-but-unreachable / CGNAT), it AUTOMATICALLY
+// enables the built-in GameNest tunnel — no toggle, no extra app — and shows a
+// single best "Friends connect to" address.
+function ConnectionPanel({
+  s, tunnel, account, onChanged,
+}: {
+  s: ServerSummary;
+  tunnel?: TunnelStatus;
+  account?: AccountStatus;
+  onChanged: () => void;
+}) {
   const [conn, setConn] = useState<Connectivity | null>(null);
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<Reachable | null>(null);
   const autoTested = useRef(false);
+  const autoTunneled = useRef(false);
 
+  // Load connectivity while running; reset auto-guards when it stops.
   useEffect(() => {
     if (!s.running) {
-      setConn(null);
-      setTest(null);
-      autoTested.current = false;
+      setConn(null); setTest(null);
+      autoTested.current = false; autoTunneled.current = false;
       return;
     }
     let alive = true;
     api.connectivity(s.id).then((c) => alive && setConn(c)).catch(() => {});
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [s.id, s.running]);
 
   async function runTest() {
     setTesting(true);
-    setTest(null);
     try {
-      setTest(await api.testConnectivity(s.id));
+      const r = await api.testConnectivity(s.id);
+      setTest(r);
     } catch (e) {
       setTest({ open: false, checked: false, detail: friendlyError(e) });
     } finally {
@@ -322,9 +160,7 @@ function ConnectionPanel({ s, relay, tunnel, account, onChanged }: { s: ServerSu
     }
   }
 
-  // Auto-confirm reachability once the port looks forwarded, so users don't have
-  // to click "Test connection" — and so a "forwarded but unreachable" state
-  // (CGNAT/firewall) surfaces on its own and routes them to the relay.
+  // Auto-run the reachability test once we have a forwarded TCP external address.
   useEffect(() => {
     if (!conn || !conn.running || autoTested.current) return;
     if (conn.forwarded && /tcp/i.test(conn.protocol) && conn.externalAddress) {
@@ -334,137 +170,55 @@ function ConnectionPanel({ s, relay, tunnel, account, onChanged }: { s: ServerSu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conn]);
 
-  async function stopSharing() {
-    try {
-      await api.setRelayAddress(s.id, "");
-    } finally {
-      onChanged();
-    }
-  }
+  const directAddr = conn?.externalAddress ?? s.externalAddress;
+  const forwarded = conn?.forwarded ?? s.shared;
+  const reachableConfirmed = !!(test && test.checked && test.open);
+  const testedNotOpen = !!(test && test.checked && !test.open);
+  // Direct works: we have an address AND (it's UPnP-forwarded and not proven-closed, or a test confirmed it).
+  const directOK = !!directAddr && (reachableConfirmed || (forwarded && !testedNotOpen));
+  // Direct has been ruled out: connectivity loaded, not direct-OK, and either no UPnP forward or a test came back closed.
+  const directFailed = !!conn && !directOK && (testedNotOpen || !forwarded);
+
+  // Auto-fallback: when direct fails and the tunnel is available, turn it on (once).
+  useEffect(() => {
+    if (autoTunneled.current) return;
+    if (!s.running || !tunnel?.configured || s.useTunnel) return;
+    if (!directFailed) return;
+    autoTunneled.current = true;
+    api.setUseTunnel(s.id, true).then(onChanged).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.running, s.id, s.useTunnel, tunnel?.configured, directFailed]);
 
   if (!s.running) {
-    return <p className="text-sm text-zinc-500">Start the server to get a connect address you can share with friends.</p>;
+    return <p className="text-sm text-zinc-500">Start the server to get a connection address.</p>;
   }
 
-  const port = conn?.port ?? s.ports?.[0]?.host;
-  const proto = (conn?.protocol ?? s.ports?.[0]?.protocol ?? "tcp").toUpperCase();
-  const addr = conn?.externalAddress ?? s.externalAddress;
-  const forwarded = conn?.forwarded ?? s.shared;
-  // A successful reachability test is the source of truth: the port can be open
-  // at the router (manual forward) even when GameNest's own UPnP mapping failed.
-  const reachableConfirmed = !!(test && test.checked && test.open);
-  const directOK = (forwarded || reachableConfirmed) && !!addr;
-  // Nudge the relay when direct hosting isn't working: either the router never
-  // forwarded the port, or it did but an external test couldn't reach it.
-  const testedNotOpen = !!(test && test.checked && !test.open);
-  const suggestRelay = !s.relayAddress && !reachableConfirmed && (testedNotOpen || !forwarded);
-
-  const testLine = test ? (
-    <p
-      className={`text-xs ${
-        test.checked ? (test.open ? "text-emerald-400" : "text-amber-400") : "text-zinc-500"
-      }`}
-    >
-      {test.checked
-        ? test.open
-          ? "✓ Reachable from the internet — friends can connect."
-          : "✗ Not reachable yet — the port isn't open from outside."
-        : test.detail}
-    </p>
-  ) : null;
-  const testBtn = (
-    <button onClick={runTest} disabled={testing} className={ghostBtn}>
-      {testing ? "Testing…" : "Test connection"}
-    </button>
-  );
-
   return (
-    <div className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+    <div className="space-y-3">
       {directOK ? (
-        <div className="space-y-2">
-          <CopyRow label="Friends connect to" addr={addr!} pill={reachableConfirmed ? reachablePill : forwardedPill} />
-          <div className="flex flex-wrap items-center gap-3">
-            {testBtn}
-            {testLine}
-          </div>
-        </div>
+        <CopyRow label="Friends connect to" addr={directAddr!} pill={reachableConfirmed ? reachablePill : forwardedPill} />
+      ) : s.tunnelAddress ? (
+        <CopyRow label="Friends connect to" addr={s.tunnelAddress} pill={tunnelPill} />
+      ) : tunnel?.configured ? (
+        <p className="text-sm text-zinc-400">Setting up a public address through GameNest — your friends will be able to join in a moment…</p>
+      ) : directAddr ? (
+        <CopyRow label="Friends connect to (unverified)" addr={directAddr} pill={forwardedPill} />
       ) : (
-        <div className="space-y-2">
-          {addr && (
-            <CopyRow
-              label="Your address"
-              addr={addr}
-              pill={<span className="text-[11px] text-amber-300">unverified</span>}
-            />
-          )}
-          <p className="text-xs text-zinc-400">
-            Click <span className="text-zinc-200">Test connection</span> to check whether friends can already reach you. If
-            not, let them connect <span className="text-zinc-200">directly</span> (nothing extra running) by signing in to
-            your router and forwarding{" "}
-            <span className="text-zinc-200">
-              port {port} ({proto})
-            </span>{" "}
-            to this PC
-            {conn?.localIP ? (
-              <>
-                {" "}
-                at <code className="font-mono text-zinc-200">{conn.localIP}</code>
-              </>
-            ) : null}
-            — or use a relay below (no router setup).
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            {testBtn}
-            {testLine}
-          </div>
-        </div>
+        <p className="text-sm text-zinc-400">Working out how friends can reach you…</p>
       )}
 
-      <div className="space-y-3 border-t border-zinc-800 pt-3">
-        {/* Built-in GameNest tunnel — the recommended no-setup sharing path, when configured. */}
-        {tunnel?.configured && <TunnelShare s={s} account={account} onChanged={onChanged} />}
+      {/* Verify-direct affordance (kept for the forwarded-but-untested case) */}
+      {directAddr && !reachableConfirmed && (
+        <button onClick={runTest} disabled={testing} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50">
+          {testing ? "Checking…" : "Test connection"}
+        </button>
+      )}
+      {test && test.checked && !test.open && (
+        <p className="text-xs text-amber-400/80">Direct connection isn't reachable — sharing through GameNest instead.</p>
+      )}
 
-        {/* playit.gg relay: the primary fallback when the built-in tunnel isn't
-            configured; otherwise demoted to an advanced option. */}
-        {s.relayAddress ? (
-          <div className="space-y-1">
-            <CopyRow label="Or via playit relay" addr={s.relayAddress} pill={relayPill} />
-            <button
-              onClick={stopSharing}
-              className="text-[11px] text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
-            >
-              change / stop relay
-            </button>
-          </div>
-        ) : tunnel?.configured ? (
-          <details>
-            <summary className="cursor-pointer text-xs text-zinc-400 hover:text-zinc-200">
-              Advanced: use a playit.gg relay instead →
-            </summary>
-            <div className="mt-2">
-              <RelaySetup s={s} relay={relay} port={port} proto={proto} onChanged={onChanged} />
-            </div>
-          </details>
-        ) : (
-          <>
-            {suggestRelay && (
-              <p className="mb-2 text-xs text-amber-300">
-                {testedNotOpen
-                  ? "Friends couldn't reach the port. If the server has finished starting, your ISP may be blocking it (CGNAT) — share via a relay below, no router setup needed."
-                  : "Your router didn't open the port automatically. Forward it manually above, or share via a relay below — no router setup needed."}
-              </p>
-            )}
-            <details open={suggestRelay}>
-              <summary className="cursor-pointer text-xs text-zinc-400 hover:text-zinc-200">
-                No router access? Share via a relay instead →
-              </summary>
-              <div className="mt-2">
-                <RelaySetup s={s} relay={relay} port={port} proto={proto} onChanged={onChanged} />
-              </div>
-            </details>
-          </>
-        )}
-      </div>
+      {/* Plus vanity, dormant until Stage C */}
+      {s.useTunnel && <VanityControl s={s} account={account} onChanged={onChanged} />}
     </div>
   );
 }
@@ -770,7 +524,6 @@ function ResourcesPanel({ s }: { s: ServerSummary }) {
 export function ServerDetail({
   server,
   template,
-  relay,
   tunnel,
   account,
   busy,
@@ -781,7 +534,6 @@ export function ServerDetail({
 }: {
   server: ServerSummary;
   template?: Template;
-  relay?: Relay;
   tunnel?: TunnelStatus;
   account?: AccountStatus;
   busy?: string;
@@ -903,7 +655,7 @@ export function ServerDetail({
               )}
               <section className="panel p-5">
                 <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-zinc-400">Connection &amp; sharing</h3>
-                <ConnectionPanel s={server} relay={relay} tunnel={tunnel} account={account} onChanged={onChanged} />
+                <ConnectionPanel s={server} tunnel={tunnel} account={account} onChanged={onChanged} />
               </section>
               <section className="panel p-5">
                 <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-zinc-400">Resources</h3>

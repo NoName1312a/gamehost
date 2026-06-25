@@ -3,7 +3,6 @@ import {
   api,
   type AccountStatus,
   type Health,
-  type Relay,
   type Runtime,
   type Setup,
   type Template,
@@ -110,7 +109,6 @@ export default function App() {
   const health = useAsync<Health>(api.health, nonce + tick);
   const runtime = useAsync<Runtime>(api.runtime, nonce + tick);
   const setup = useAsync<Setup>(api.setup, nonce + tick);
-  const relay = useAsync<Relay>(api.relay, nonce + tick);
   const tunnel = useAsync<TunnelStatus>(api.tunnel, nonce + tick);
   const account = useAsync<AccountStatus>(api.account, nonce + tick);
   const templates = useAsync<Template[]>(api.templates, nonce);
@@ -287,7 +285,6 @@ export default function App() {
               key={detailServer.id}
               server={detailServer}
               template={templates.status === "ok" ? templates.data.find((t) => t.id === detailServer.templateId) : undefined}
-              relay={relay.status === "ok" ? relay.data : undefined}
               tunnel={tunnel.status === "ok" ? tunnel.data : undefined}
               account={account.status === "ok" ? account.data : undefined}
               busy={busy[detailServer.id]}
