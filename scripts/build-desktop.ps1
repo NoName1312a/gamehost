@@ -53,22 +53,6 @@ Copy-Item "$root\engine\bin\engine.exe" (Join-Path $binDir "engine-$triple.exe")
 Invoke-Sign (Join-Path $binDir "engine-$triple.exe")
 Write-Host "Staged sidecar: desktop\binaries\engine-$triple.exe" -ForegroundColor Green
 
-# Bundle the playit relay agent (headless, signed CLI) as a sidecar so users
-# don't need a separate winget install / tray app. Cached by version. The engine
-# runs it on demand (only while a relay-shared server is hosting) via the
-# GAMEHOST_PLAYIT path the desktop shell passes in.
-$playitVer = "1.0.6"
-$playitUrl = "https://github.com/playit-cloud/playit-agent/releases/download/v$playitVer/playit-windows-x86_64-signed.exe"
-$cacheDir = Join-Path $binDir ".cache"
-New-Item -ItemType Directory -Force -Path $cacheDir | Out-Null
-$playitCache = Join-Path $cacheDir "playit-$playitVer.exe"
-if (-not (Test-Path $playitCache)) {
-    Write-Host "Downloading playit agent v$playitVer..." -ForegroundColor Cyan
-    Invoke-WebRequest -Uri $playitUrl -OutFile $playitCache -UseBasicParsing
-}
-Copy-Item $playitCache (Join-Path $binDir "playit-$triple.exe") -Force
-Write-Host "Staged sidecar: desktop\binaries\playit-$triple.exe" -ForegroundColor Green
-
 # Bundle the frp client (frpc) as a sidecar for the built-in GameNest tunnel
 # (the "Share with friends" feature). The engine runs it on demand via the
 # GAMEHOST_FRPC path the desktop shell passes in. We COMPILE frpc from source
@@ -77,6 +61,8 @@ Write-Host "Staged sidecar: desktop\binaries\playit-$triple.exe" -ForegroundColo
 # from-source build has a hash that isn't in AV signature databases. (frp's go.mod
 # uses `replace` directives, so `go install pkg@version` is refused; we build from
 # a shallow git checkout instead.) Sign it too (Invoke-Sign) for the durable fix.
+$cacheDir = Join-Path $binDir ".cache"
+New-Item -ItemType Directory -Force -Path $cacheDir | Out-Null
 $frpVer = "0.69.1"
 $stagedFrpc = Join-Path $binDir "frpc-$triple.exe"
 $frpSrc = Join-Path $cacheDir "frp-src-$frpVer"

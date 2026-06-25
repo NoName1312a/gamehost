@@ -44,7 +44,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/engine", "binaries/playit", "binaries/frpc"],
+    "externalBin": ["binaries/engine", "binaries/frpc"],
     "resources": ["resources/templates/*", "resources/uninstall-cleanup.ps1"],
     "windows": {
       "webviewInstallMode": { "type": "downloadBootstrapper" },

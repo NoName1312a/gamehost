@@ -37,27 +37,9 @@ fn resolve_templates_dir(app: &tauri::App) -> Option<PathBuf> {
     candidates.into_iter().find(|p| p.is_dir())
 }
 
-/// Resolve the bundled playit relay agent: next to the app exe (where Tauri
-/// installs externalBins, target-triple stripped) for the installed app, or the
-/// staged binary under the crate dir for `tauri dev`. Returns `None` if not
-/// found, in which case the engine falls back to a system/winget playit.
-fn resolve_playit() -> Option<PathBuf> {
-    let mut candidates: Vec<PathBuf> = Vec::new();
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            candidates.push(dir.join("playit.exe"));
-        }
-    }
-    candidates.push(PathBuf::from(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/binaries/playit-x86_64-pc-windows-msvc.exe"
-    )));
-    candidates.into_iter().find(|p| p.is_file())
-}
-
-/// Resolve the bundled frpc client for the built-in tunnel, mirroring
-/// resolve_playit: next to the app exe (installed app) or the staged binary
-/// under the crate dir (`tauri dev`). None falls back to a system/PATH frpc.
+/// Resolve the bundled frpc client for the built-in tunnel: next to the app
+/// exe (installed app) or the staged binary under the crate dir (`tauri dev`).
+/// None falls back to a system/PATH frpc.
 fn resolve_frpc() -> Option<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
@@ -100,11 +82,6 @@ fn main() {
             // and leaves engine.exe locked / port 8723 held. It watches its stdin
             // pipe, which the OS closes when this process exits.
             sidecar = sidecar.env("GAMEHOST_PARENT_WATCH", "1");
-            // Point the engine at the bundled playit agent so the relay needs no
-            // separate winget install. The engine runs it only while hosting.
-            if let Some(playit) = resolve_playit() {
-                sidecar = sidecar.env("GAMEHOST_PLAYIT", playit.to_string_lossy().to_string());
-            }
             // Point the engine at the bundled frpc for the built-in tunnel. This
             // only locates the binary; the tunnel itself stays dormant until the
             // engine is given a control-plane URL (GAMEHOST_TUNNEL_URL).
