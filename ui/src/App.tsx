@@ -25,6 +25,7 @@ import { Logo } from "./components/icons";
 import { Dashboard } from "./components/Dashboard";
 import { Account } from "./components/Account";
 import { GetStartedChecklist } from "./components/GetStartedChecklist";
+import { Onboarding } from "./components/Onboarding";
 
 // ---- tiny async helper -----------------------------------------------------
 
@@ -126,6 +127,9 @@ export default function App() {
   const [invitedFriend] = useState<boolean>(
     () => localStorage.getItem("gamenest.invitedFriend") === "true",
   );
+  const [onboardingDone, setOnboardingDone] = useState<boolean>(
+    () => localStorage.getItem("gamenest.onboardingDone") === "true",
+  );
 
   // Auth gate: loopback (desktop) is always authenticated, so this only ever
   // shows a login for remote browsers. null = unknown (don't gate yet).
@@ -172,6 +176,16 @@ export default function App() {
       .catch(() => {});
   }, []);
 
+  // Auto-mark onboarding done for existing users (servers already present) so
+  // they never see the first-run flow. Only fires on the data transition.
+  useEffect(() => {
+    if (!onboardingDone && servers && servers.length > 0) {
+      localStorage.setItem("gamenest.onboardingDone", "true");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOnboardingDone(true);
+    }
+  }, [onboardingDone, servers]);
+
   async function action(id: string, label: string, fn: () => Promise<unknown>) {
     setBusy((b) => ({ ...b, [id]: label }));
     setToast(null);
@@ -189,6 +203,15 @@ export default function App() {
     }
   }
 
+  const runtimeReady = runtime.status === "ok" && runtime.data.connected;
+
+  function finishOnboarding() {
+    localStorage.setItem("gamenest.onboardingDone", "true");
+    setOnboardingDone(true);
+  }
+
+  const firstRun = !onboardingDone && servers !== null && servers.length === 0;
+
   if (health.status === "error") {
     return <EngineOffline error={health.error} onRetry={retry} />;
   }
@@ -204,8 +227,19 @@ export default function App() {
     );
   }
 
+  if (firstRun) {
+    return (
+      <Onboarding
+        setup={setup}
+        runtimeReady={runtimeReady}
+        onRecheck={retry}
+        onFinish={finishOnboarding}
+        onSkip={finishOnboarding}
+      />
+    );
+  }
+
   const version = health.status === "ok" ? health.data.version : undefined;
-  const runtimeReady = runtime.status === "ok" && runtime.data.connected;
 
   // The open detail page tracks the live server record from the polled list, so
   // its status/share panels update without re-opening. Closes if it's deleted.
