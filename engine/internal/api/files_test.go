@@ -61,7 +61,7 @@ func newTestAPIFull(t *testing.T) (http.Handler, *server.Manager, *auth.Store, *
 		t.Fatalf("load templates: %v", err)
 	}
 	rt := docker.New()
-	mgr, err := server.NewManager(t.TempDir(), rt, nil, nil, reg)
+	mgr, err := server.NewManager(t.TempDir(), rt, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}

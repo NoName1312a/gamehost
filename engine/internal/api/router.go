@@ -19,7 +19,6 @@ import (
 	"github.com/leop1/gamehost/engine/internal/docker"
 	"github.com/leop1/gamehost/engine/internal/license"
 	"github.com/leop1/gamehost/engine/internal/network"
-	"github.com/leop1/gamehost/engine/internal/relay"
 	"github.com/leop1/gamehost/engine/internal/remote"
 	"github.com/leop1/gamehost/engine/internal/server"
 	"github.com/leop1/gamehost/engine/internal/telemetry"
@@ -38,7 +37,6 @@ type Deps struct {
 	Reg       *templates.Registry
 	Mgr       *server.Manager
 	Net       *network.Mapper
-	Relay     *relay.Agent
 	Tunnel    *tunnel.Agent
 	Auth      *auth.Store
 	Remote    *remote.Controller
@@ -58,7 +56,6 @@ type API struct {
 	reg          *templates.Registry
 	mgr          *server.Manager
 	net          *network.Mapper
-	relay        *relay.Agent
 	tunnel       *tunnel.Agent
 	auth         *auth.Store
 	remote       *remote.Controller
@@ -72,7 +69,7 @@ type API struct {
 // NewRouter wires up the HTTP routes and middleware. It also hands the assembled
 // handler to the remote controller so the remote listener serves the same API.
 func NewRouter(d Deps) http.Handler {
-	a := &API{cfg: d.Cfg, rt: d.RT, reg: d.Reg, mgr: d.Mgr, net: d.Net, relay: d.Relay, tunnel: d.Tunnel,
+	a := &API{cfg: d.Cfg, rt: d.RT, reg: d.Reg, mgr: d.Mgr, net: d.Net, tunnel: d.Tunnel,
 		auth: d.Auth, remote: d.Remote, audit: d.Audit, license: d.License, telemetry: d.Telemetry,
 		account: d.Account, loginLimiter: newLoginLimiter(5, 5*time.Minute)}
 
@@ -128,9 +125,6 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/system/telemetry", a.telemetryStatus)
 			r.Post("/system/telemetry", a.setTelemetry)
 			r.Post("/system/purge", a.purgeData)
-			r.Get("/system/relay", a.relayStatus)
-			r.Post("/system/relay/link", a.relayLink)
-			r.Post("/system/relay/{action}", a.relayAction)
 			r.Get("/system/tunnel", a.tunnelStatus)
 
 			r.Get("/templates", a.listTemplates)
@@ -139,7 +133,6 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/servers", a.listServers)
 			r.Post("/servers", a.createServer)
 			r.Patch("/servers/{id}", a.updateServer)
-			r.Put("/servers/{id}/relay-address", a.setRelayAddress)
 			r.Put("/servers/{id}/use-tunnel", a.setUseTunnel)
 			r.Put("/servers/{id}/vanity", a.setVanitySlug)
 			r.Get("/servers/{id}/connectivity", a.connectivity)

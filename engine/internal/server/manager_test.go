@@ -70,15 +70,6 @@ func (f *fakeRuntime) ExportBackup(_ context.Context, _, _ string, w io.Writer) 
 func (f *fakeRuntime) ImageExists(context.Context, string) bool              { return true }
 func (f *fakeRuntime) Pull(context.Context, string, func(int, string)) error { return nil }
 
-// fakeRelay records start/stop calls so tests can assert the agent's lifecycle.
-type fakeRelay struct {
-	started bool
-	stops   int
-}
-
-func (f *fakeRelay) Start() error { f.started = true; return nil }
-func (f *fakeRelay) Stop()        { f.started = false; f.stops++ }
-
 const testTemplate = `id: test-mc
 name: Test MC
 game: minecraft
@@ -117,7 +108,7 @@ func newTestManager(t *testing.T) (*Manager, string) {
 		t.Fatalf("load templates: %v", err)
 	}
 	dataDir := t.TempDir()
-	m, err := NewManager(dataDir, &fakeRuntime{}, nil, nil, reg)
+	m, err := NewManager(dataDir, &fakeRuntime{}, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -162,7 +153,7 @@ func TestCreateAppliesCPUsToSpec(t *testing.T) {
 		t.Fatalf("load templates: %v", err)
 	}
 	rt := &fakeRuntime{} // zero state => container "not created" => Start calls Run
-	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	m, err := NewManager(t.TempDir(), rt, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -240,7 +231,7 @@ func TestPersistenceRoundTrip(t *testing.T) {
 
 	// A fresh manager over the same dir should load the server back.
 	reg := m.reg
-	m2, err := NewManager(dataDir, &fakeRuntime{state: docker.State{Exists: true, Status: "running", Running: true}}, nil, nil, reg)
+	m2, err := NewManager(dataDir, &fakeRuntime{state: docker.State{Exists: true, Status: "running", Running: true}}, nil, reg)
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
@@ -311,57 +302,6 @@ func TestUpdateRejectsConflictingPortAndLowMemory(t *testing.T) {
 	}
 }
 
-func TestRelayRunsOnlyWhileHosting(t *testing.T) {
-	build := func(rt Runtime, rel Relay) *Manager {
-		tdir := t.TempDir()
-		if err := os.WriteFile(filepath.Join(tdir, "test-mc.yaml"), []byte(testTemplate), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		reg := templates.NewRegistry(tdir)
-		if err := reg.Load(); err != nil {
-			t.Fatalf("load templates: %v", err)
-		}
-		m, err := NewManager(t.TempDir(), rt, nil, rel, reg)
-		if err != nil {
-			t.Fatalf("new manager: %v", err)
-		}
-		return m
-	}
-
-	// A running relay-shared server brings the agent up.
-	rel := &fakeRelay{}
-	m := build(&fakeRuntime{state: docker.State{Exists: true, Running: true, Status: "running"}}, rel)
-	s, _ := m.Create(CreateRequest{TemplateID: "test-mc", Name: "A", Port: 25565})
-	if err := m.SetRelayAddress(s.ID, "abc.playit.gg:30000"); err != nil {
-		t.Fatalf("set relay: %v", err)
-	}
-	if !rel.started {
-		t.Error("relay should be running while a relay-shared server is up")
-	}
-
-	// A server with no relay address must not start the agent, even when running.
-	rel2 := &fakeRelay{}
-	m2 := build(&fakeRuntime{state: docker.State{Exists: true, Running: true, Status: "running"}}, rel2)
-	s2, _ := m2.Create(CreateRequest{TemplateID: "test-mc", Name: "B", Port: 25565})
-	if err := m2.Start(context.Background(), s2.ID); err != nil {
-		t.Fatalf("start: %v", err)
-	}
-	if rel2.started {
-		t.Error("relay should not start for a server with no relay address")
-	}
-
-	// A relay-shared server that isn't running keeps the agent stopped.
-	rel3 := &fakeRelay{}
-	m3 := build(&fakeRuntime{state: docker.State{Exists: true, Running: false, Status: "exited"}}, rel3)
-	s3, _ := m3.Create(CreateRequest{TemplateID: "test-mc", Name: "C", Port: 25565})
-	if err := m3.SetRelayAddress(s3.ID, "abc.playit.gg:30000"); err != nil {
-		t.Fatalf("set relay: %v", err)
-	}
-	if rel3.started || rel3.stops == 0 {
-		t.Errorf("relay should be stopped when no relay-shared server is running (started=%v stops=%d)", rel3.started, rel3.stops)
-	}
-}
-
 func TestValidHHMM(t *testing.T) {
 	valid := []string{"", "00:00", "23:59", "09:30", "12:05"}
 	invalid := []string{"9:30", "24:00", "12:60", "1234", "ab:cd", "12:5", "012:00"}
@@ -399,7 +339,7 @@ func TestLoadMigratesLegacyArray(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dataDir, "servers.json"), []byte(legacy), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m, err := NewManager(dataDir, &fakeRuntime{}, nil, nil, testRegistry(t))
+	m, err := NewManager(dataDir, &fakeRuntime{}, nil, testRegistry(t))
 	if err != nil {
 		t.Fatalf("new manager over legacy file: %v", err)
 	}
@@ -413,7 +353,7 @@ func TestLoadMigratesLegacyArray(t *testing.T) {
 // and rotate a .bak recovery copy of the previous good file.
 func TestSaveWritesVersionedFormatAndBak(t *testing.T) {
 	dataDir := t.TempDir()
-	m, err := NewManager(dataDir, &fakeRuntime{}, nil, nil, testRegistry(t))
+	m, err := NewManager(dataDir, &fakeRuntime{}, nil, testRegistry(t))
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -441,7 +381,7 @@ func TestSaveWritesVersionedFormatAndBak(t *testing.T) {
 func TestLoadRecoversFromBak(t *testing.T) {
 	dataDir := t.TempDir()
 	reg := testRegistry(t)
-	m, err := NewManager(dataDir, &fakeRuntime{}, nil, nil, reg)
+	m, err := NewManager(dataDir, &fakeRuntime{}, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -457,7 +397,7 @@ func TestLoadRecoversFromBak(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dataDir, "servers.json"), []byte("{ this is corrupt"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m2, err := NewManager(dataDir, &fakeRuntime{}, nil, nil, reg)
+	m2, err := NewManager(dataDir, &fakeRuntime{}, nil, reg)
 	if err != nil {
 		t.Fatalf("expected recovery from .bak, got error: %v", err)
 	}
@@ -472,7 +412,7 @@ func TestLoadRecoversFromBak(t *testing.T) {
 func TestNoRunningServerCap(t *testing.T) {
 	reg := testRegistry(t)
 	rt := &fakeRuntime{running: map[string]bool{}}
-	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	m, err := NewManager(t.TempDir(), rt, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -493,7 +433,7 @@ func TestNoRunningServerCap(t *testing.T) {
 func TestSetModsAppliesToSpec(t *testing.T) {
 	reg := testRegistry(t)
 	rt := &fakeRuntime{} // not running -> SetMods just persists; Start captures spec
-	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	m, err := NewManager(t.TempDir(), rt, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -542,7 +482,7 @@ func TestBackupCopiesOffsiteWhenConfigured(t *testing.T) {
 	reg := testRegistry(t)
 	rt := &fakeRuntime{exportData: []byte("ARCHIVE-BYTES")}
 	dataDir := t.TempDir()
-	m, err := NewManager(dataDir, rt, nil, nil, reg)
+	m, err := NewManager(dataDir, rt, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -607,7 +547,7 @@ func (f *fakeTunnel) Reconcile(_ context.Context, want []TunnelWant) (map[string
 func TestTunnelSharesRunningServersOnly(t *testing.T) {
 	reg := testRegistry(t)
 	rt := &fakeRuntime{running: map[string]bool{}}
-	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	m, err := NewManager(t.TempDir(), rt, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -727,7 +667,7 @@ func (f *fakeAccount) Entitlement(_ context.Context, slug string) (string, error
 func TestVanitySlugEntitlementFetched(t *testing.T) {
 	reg := testRegistry(t)
 	rt := &fakeRuntime{running: map[string]bool{}}
-	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	m, err := NewManager(t.TempDir(), rt, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -780,7 +720,7 @@ func TestVanitySlugEntitlementFetched(t *testing.T) {
 func TestGnSlugGetsEmptyEntitlement(t *testing.T) {
 	reg := testRegistry(t)
 	rt := &fakeRuntime{running: map[string]bool{}}
-	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	m, err := NewManager(t.TempDir(), rt, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -813,7 +753,7 @@ func TestGnSlugGetsEmptyEntitlement(t *testing.T) {
 func TestVanitySlugEntitlementErrorSkipsServer(t *testing.T) {
 	reg := testRegistry(t)
 	rt := &fakeRuntime{running: map[string]bool{}}
-	m, err := NewManager(t.TempDir(), rt, nil, nil, reg)
+	m, err := NewManager(t.TempDir(), rt, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}

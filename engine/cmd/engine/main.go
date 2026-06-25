@@ -23,7 +23,6 @@ import (
 	"github.com/leop1/gamehost/engine/internal/docker"
 	"github.com/leop1/gamehost/engine/internal/license"
 	"github.com/leop1/gamehost/engine/internal/network"
-	"github.com/leop1/gamehost/engine/internal/relay"
 	"github.com/leop1/gamehost/engine/internal/remote"
 	"github.com/leop1/gamehost/engine/internal/safe"
 	"github.com/leop1/gamehost/engine/internal/server"
@@ -47,7 +46,6 @@ func main() {
 
 	rt := docker.New()
 	netMapper := network.New()
-	relayAgent := relay.New(cfg.DataDir)
 
 	// The built-in GameNest tunnel is on by default (baked relay URL). Set
 	// GAMEHOST_TUNNEL_DISABLE=1 to force it off, or GAMEHOST_TUNNEL_URL to
@@ -73,7 +71,7 @@ func main() {
 		slog.Info("loaded game templates", "count", len(reg.List()), "dir", cfg.TemplatesDir)
 	}
 
-	mgr, err := server.NewManager(cfg.DataDir, rt, netMapper, relayAgent, reg)
+	mgr, err := server.NewManager(cfg.DataDir, rt, netMapper, reg)
 	if err != nil {
 		slog.Error("failed to initialize server manager", "err", err)
 		os.Exit(1)
@@ -106,7 +104,7 @@ func main() {
 	srv := &http.Server{
 		Addr: cfg.Addr,
 		Handler: api.NewRouter(api.Deps{
-			Cfg: cfg, RT: rt, Reg: reg, Mgr: mgr, Net: netMapper, Relay: relayAgent, Tunnel: tunAgent,
+			Cfg: cfg, RT: rt, Reg: reg, Mgr: mgr, Net: netMapper, Tunnel: tunAgent,
 			Auth: authStore, Remote: remoteCtrl, Audit: auditLog, License: licenseStore,
 			Telemetry: telStore, Account: acctStore,
 		}),
@@ -117,9 +115,6 @@ func main() {
 	if err := remoteCtrl.StartIfEnabled(); err != nil {
 		slog.Warn("remote access failed to start", "err", err)
 	}
-
-	// The relay agent is started on demand by the manager — only while a
-	// relay-shared server is actually running — so it's never always-on.
 
 	// Drive per-server daily restart/backup schedules for the engine's lifetime.
 	schedCtx, schedCancel := context.WithCancel(context.Background())
@@ -166,7 +161,6 @@ func main() {
 	defer cancel()
 	// Remove any UPnP port mappings so they don't linger on the router.
 	netMapper.UnmapAll(ctx)
-	relayAgent.Stop()
 	if tunAgent != nil {
 		tunAgent.Stop()
 	}

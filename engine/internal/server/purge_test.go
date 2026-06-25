@@ -19,7 +19,7 @@ func TestPurgeAllRemovesAndPersists(t *testing.T) {
 		t.Fatalf("load templates: %v", err)
 	}
 	dataDir := t.TempDir()
-	m, err := NewManager(dataDir, &fakeRuntime{}, nil, nil, reg)
+	m, err := NewManager(dataDir, &fakeRuntime{}, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestPurgeAllRemovesAndPersists(t *testing.T) {
 	}
 
 	// Purge must persist: a fresh manager over the same data dir sees nothing.
-	m2, err := NewManager(dataDir, &fakeRuntime{}, nil, nil, reg)
+	m2, err := NewManager(dataDir, &fakeRuntime{}, nil, reg)
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}

@@ -34,7 +34,7 @@ func buildRouterWithAccount(t *testing.T, acct *account.Store) (http.Handler, *s
 		t.Fatalf("load templates: %v", err)
 	}
 	rt := docker.New()
-	mgr, err := server.NewManager(t.TempDir(), rt, nil, nil, reg)
+	mgr, err := server.NewManager(t.TempDir(), rt, nil, reg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}

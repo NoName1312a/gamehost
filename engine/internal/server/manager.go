@@ -46,8 +46,9 @@ type Server struct {
 	DataPath      string   `json:"dataPath"`
 	CommandMethod string   `json:"commandMethod"`
 	CreatedAt     string   `json:"createdAt"`
-	// RelayAddress is the public playit.gg address the user pasted back from
-	// the playit dashboard for sharing this server. Empty if not using a relay.
+	// RelayAddress was the public playit.gg address the user pasted back from
+	// the playit dashboard for sharing this server.
+	// deprecated: playit removed; retained so existing servers.json isn't lost.
 	RelayAddress string `json:"relayAddress,omitempty"`
 	// UseTunnel shares this server through the built-in GameNest tunnel (a
 	// bundled frpc client + self-hosted relay), giving it a public
@@ -126,14 +127,6 @@ type Networking interface {
 	IsMapped(port int, proto string) bool
 }
 
-// Relay is the subset of the playit relay agent the manager needs. *relay.Agent
-// implements it. Optional (may be nil). The manager drives it so the agent runs
-// only while a relay-shared server is actually hosting — not always-on.
-type Relay interface {
-	Start() error
-	Stop()
-}
-
 // Tunnel is the built-in GameNest tunnel the manager drives. *tunnel.Agent
 // implements it via a small adapter, since the manager keeps its own
 // dependency-decoupled types (like Runtime/Networking/Relay). Optional (may be
@@ -190,7 +183,6 @@ type Manager struct {
 	path    string
 	rt      Runtime
 	net     Networking // optional; nil disables auto port-forwarding
-	relay   Relay      // optional; nil disables relay lifecycle management
 	tun     Tunnel     // optional; nil disables the built-in tunnel
 	acct    Account    // optional; nil disables entitlement fetch for vanity slugs
 	reg     *templates.Registry
@@ -211,9 +203,8 @@ type pullState struct {
 }
 
 // NewManager creates the data dir, loads existing servers, and returns a
-// Manager. net and rel may be nil to disable UPnP auto-forwarding / relay
-// supervision respectively.
-func NewManager(dataDir string, rt Runtime, net Networking, rel Relay, reg *templates.Registry) (*Manager, error) {
+// Manager. net may be nil to disable UPnP auto-forwarding.
+func NewManager(dataDir string, rt Runtime, net Networking, reg *templates.Registry) (*Manager, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
@@ -221,7 +212,6 @@ func NewManager(dataDir string, rt Runtime, net Networking, rel Relay, reg *temp
 		path:    filepath.Join(dataDir, "servers.json"),
 		rt:      rt,
 		net:     net,
-		relay:   rel,
 		reg:     reg,
 		offsite: offsite.New(dataDir),
 		items:   map[string]*Server{},
@@ -384,21 +374,6 @@ func (m *Manager) Get(id string) (*Server, bool) {
 	defer m.mu.RUnlock()
 	s, ok := m.items[id]
 	return s, ok
-}
-
-// SetRelayAddress stores the playit relay address the user shares for a server.
-func (m *Manager) SetRelayAddress(id, addr string) error {
-	m.mu.Lock()
-	s, ok := m.items[id]
-	if !ok {
-		m.mu.Unlock()
-		return fmt.Errorf("server not found")
-	}
-	s.RelayAddress = strings.TrimSpace(addr)
-	err := m.save()
-	m.mu.Unlock()
-	m.syncRelay() // a server gaining/losing a relay address may flip agent state
-	return err
 }
 
 // SetTunnel attaches the built-in tunnel agent. Done via a setter (not
@@ -791,7 +766,6 @@ func (m *Manager) Start(ctx context.Context, id string) error {
 		return err
 	}
 	m.mapPorts(ctx, s)
-	m.syncRelay()
 	m.syncTunnel()
 	return nil
 }
@@ -823,7 +797,6 @@ func (m *Manager) Stop(ctx context.Context, id string) error {
 	}
 	err := m.rt.Stop(ctx, s.ContainerName())
 	m.unmapPorts(ctx, s)
-	m.syncRelay()
 	m.syncTunnel()
 	return err
 }
@@ -868,7 +841,6 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 	delete(m.items, id)
 	err := m.save()
 	m.mu.Unlock()
-	m.syncRelay()
 	m.syncTunnel()
 	return err
 }
@@ -919,43 +891,6 @@ func (m *Manager) unmapPorts(ctx context.Context, s *Server) {
 	for _, p := range s.Ports {
 		_ = m.net.Unmap(ctx, p.Host, p.Protocol)
 	}
-}
-
-// syncRelay runs the playit relay agent iff at least one relay-shared server is
-// currently running, and stops it otherwise — so it's never "always on", only
-// up while you're actually hosting something shared through it. Best-effort.
-func (m *Manager) syncRelay() {
-	if m.relay == nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if m.anyRelayServerRunning(ctx) {
-		if err := m.relay.Start(); err != nil {
-			slog.Debug("relay start skipped", "err", err)
-		}
-	} else {
-		m.relay.Stop()
-	}
-}
-
-// anyRelayServerRunning reports whether a server with a relay address has a
-// running container.
-func (m *Manager) anyRelayServerRunning(ctx context.Context) bool {
-	m.mu.RLock()
-	shared := make([]*Server, 0)
-	for _, s := range m.items {
-		if strings.TrimSpace(s.RelayAddress) != "" {
-			shared = append(shared, s)
-		}
-	}
-	m.mu.RUnlock()
-	for _, s := range shared {
-		if m.rt.Inspect(ctx, s.ContainerName()).Running {
-			return true
-		}
-	}
-	return false
 }
 
 // syncTunnel reconciles the built-in tunnel against the set of running,
