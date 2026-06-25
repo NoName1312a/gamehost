@@ -2,7 +2,7 @@ import { type ServerSummary } from "../lib/api";
 
 /** A server is shareable once it has any friend-facing address. */
 function hasShareAddress(s: ServerSummary): boolean {
-  return Boolean(s.tunnelAddress || s.externalAddress || s.relayAddress);
+  return Boolean(s.tunnelAddress || s.externalAddress);
 }
 
 export function GetStartedChecklist({

@@ -50,15 +50,6 @@ export interface Network {
   message: string;
 }
 
-export interface Relay {
-  installed: boolean;
-  linked: boolean;
-  running: boolean;
-  setupUrl: string;
-  dashboardUrl: string;
-  message: string;
-}
-
 // TunnelStatus is the built-in GameNest tunnel's feature state. configured is
 // false when the engine has no control-plane URL (the feature is dormant).
 export interface TunnelStatus {
@@ -160,7 +151,8 @@ export interface ServerSummary {
   // Connectivity (populated for running servers once UPnP discovery resolves).
   externalAddress?: string; // public "host:port" friends connect to
   shared?: boolean; // port currently forwarded on the router
-  relayAddress?: string; // playit relay address the user pasted back for sharing
+  // deprecated (playit removed); retained so existing servers keep the value
+  relayAddress?: string;
   useTunnel?: boolean; // sharing via the built-in GameNest tunnel
   tunnelSlug?: string; // stable public slug for this server's tunnel
   tunnelAddress?: string; // primary public "host:port" via the built-in tunnel
@@ -305,11 +297,6 @@ export const api = {
   // endpoint is the absolute API path from a SetupStep's action (e.g. /api/system/setup/start-docker).
   runSetupStep: (endpoint: string) => send<SetupActionResult>("POST", endpoint),
   network: () => get<Network>("/api/system/network"),
-  relay: () => get<Relay>("/api/system/relay"),
-  relayAction: (action: string) => send<{ status: string }>("POST", `/api/system/relay/${action}`),
-  relayLink: (secret: string) => send<{ status: string }>("POST", "/api/system/relay/link", { secret }),
-  setRelayAddress: (id: string, address: string) =>
-    send<{ status: string }>("PUT", `/api/servers/${id}/relay-address`, { address }),
   tunnel: () => get<TunnelStatus>("/api/system/tunnel"),
   setUseTunnel: (id: string, on: boolean) =>
     send<{ status: string }>("PUT", `/api/servers/${id}/use-tunnel`, { on }),

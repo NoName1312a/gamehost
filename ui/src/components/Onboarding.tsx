@@ -121,16 +121,16 @@ export function Onboarding({
           <div className="text-center">
             <Logo className="mx-auto h-12 w-12 text-emerald-400" />
             <h1 className="mt-4 font-display text-2xl font-semibold text-zinc-100">You're live!</h1>
-            {liveServer && (liveServer.tunnelAddress || liveServer.externalAddress || liveServer.relayAddress) ? (
+            {liveServer && (liveServer.tunnelAddress || liveServer.externalAddress) ? (
               <>
                 <p className="mt-2 text-sm text-zinc-400">Send this address to a friend so they can join:</p>
                 <div className="mx-auto mt-4 flex max-w-sm items-center gap-2">
                   <code className="min-w-0 flex-1 truncate rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-left font-mono text-sm text-emerald-300">
-                    {liveServer.tunnelAddress || liveServer.externalAddress || liveServer.relayAddress}
+                    {liveServer.tunnelAddress || liveServer.externalAddress}
                   </code>
                   <button
                     onClick={() => {
-                      const addr = liveServer.tunnelAddress || liveServer.externalAddress || liveServer.relayAddress || "";
+                      const addr = liveServer.tunnelAddress || liveServer.externalAddress || "";
                       navigator.clipboard?.writeText(addr);
                       onMarkInvited();
                     }}
