@@ -157,18 +157,11 @@ export function GetStartedChecklist({
 
 - [ ] **Step 2: Add `invitedFriend` state in `App.tsx`**
 
-Near the other `useState` calls (~`:117-124`), add (it reads the existing `gamenest.*` localStorage namespace, mirroring the `gamenest.lastSeenVersion` usage already in the file):
+Near the other `useState` calls (~`:117-124`), add a **read-only** state (it reads the existing `gamenest.*` localStorage namespace, mirroring the `gamenest.lastSeenVersion` usage already in the file). The checklist only *reads* `invitedFriend`; the setter and the `markInvited` helper are added in **Task 4** when the "copy share address" moment first writes the flag — adding an unused setter/helper now would trip `noUnusedLocals`:
 ```tsx
-const [invitedFriend, setInvitedFriend] = useState<boolean>(
+const [invitedFriend] = useState<boolean>(
   () => localStorage.getItem("gamenest.invitedFriend") === "true",
 );
-```
-And add a stable helper (above the `return`, with the other derivations ~`:203`) that later tasks also call:
-```tsx
-function markInvited() {
-  localStorage.setItem("gamenest.invitedFriend", "true");
-  setInvitedFriend(true);
-}
 ```
 
 - [ ] **Step 3: Render the checklist in the dashboard branch**
@@ -512,7 +505,18 @@ The `live` step reads the live server from the polled `servers` (passed in), so 
 
 - [ ] **Step 4: Wire the new props from `App.tsx`**
 
-Update the `<Onboarding .../>` early-return (from Task 3) to pass the new props:
+First add the invite helper that this task introduces (Task 2 added `invitedFriend` read-only). Change `const [invitedFriend] = useState(...)` to include the setter, and add the `markInvited` helper alongside the other derivations (~`:203`):
+```tsx
+const [invitedFriend, setInvitedFriend] = useState<boolean>(
+  () => localStorage.getItem("gamenest.invitedFriend") === "true",
+);
+// ...
+function markInvited() {
+  localStorage.setItem("gamenest.invitedFriend", "true");
+  setInvitedFriend(true);
+}
+```
+Then update the `<Onboarding .../>` early-return (from Task 3) to pass the new props:
 ```tsx
 if (firstRun) {
   return (
@@ -531,7 +535,7 @@ if (firstRun) {
   );
 }
 ```
-Ensure `groupGames` is imported in `App.tsx` (it's used by the picker overlay already — confirm the import exists; if not, add `import { groupGames } from "./lib/games";`). `markInvited` is from Task 2; `action`/`api`/`setView`/`templates`/`servers` already exist.
+Ensure `groupGames` is imported in `App.tsx` (it's used by the picker overlay already — confirm the import exists; if not, add `import { groupGames } from "./lib/games";`). `markInvited` is added in this task's Step 4 above; `action`/`api`/`setView`/`templates`/`servers` already exist.
 
 Note: `onOpenServer` finishes onboarding **and** navigates to the new server's detail; the plain **Open my server** path works even if `onFinish` was already called (idempotent — it just re-sets the flag).
 
