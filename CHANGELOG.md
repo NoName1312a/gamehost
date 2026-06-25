@@ -9,6 +9,15 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-25
+
+### Added
+- **Guided first-run onboarding.** New users get a Welcome → quick Docker setup → pick-a-game → "You're live" flow that walks you all the way to a running server, with the share address ready to send to a friend.
+- **"Get started" checklist** on the Dashboard — Set up Docker · Create your first server · Invite a friend — that tracks real progress and auto-hides once you're set up.
+
+### Changed
+- The Docker setup screen now matches the rest of the app (glass panels, brand fonts), completing the app-wide redesign.
+
 ## [0.4.9] - 2026-06-24
 
 ### Changed
