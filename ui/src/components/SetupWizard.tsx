@@ -10,12 +10,12 @@ type Async<T> =
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-6 mt-6 rounded-lg border border-amber-500/20 bg-amber-500/5 p-5">
+    <div className="panel mx-6 mt-6 p-5">
       <div className="flex items-center gap-3">
         <span className="h-2 w-2 rounded-full bg-amber-400" />
-        <h2 className="text-sm font-semibold text-amber-100">Set up Docker to start hosting</h2>
+        <h2 className="font-display text-sm font-semibold text-zinc-100">Set up Docker to start hosting</h2>
       </div>
-      <p className="mt-2 text-sm text-amber-200/80">
+      <p className="mt-2 text-sm text-zinc-400">
         GameNest runs each game server in its own container. A few one-time steps and you're ready —
         we'll do the work, just approve the Windows prompts.
       </p>
@@ -34,7 +34,7 @@ export function SetupWizard({
   if (setup.status === "loading") {
     return (
       <Shell>
-        <p className="mt-3 text-sm text-amber-200/70">Checking your system…</p>
+        <p className="mt-3 text-sm text-zinc-400">Checking your system…</p>
       </Shell>
     );
   }
@@ -66,7 +66,7 @@ function RecheckButton({ onRecheck }: { onRecheck: () => void }) {
   return (
     <button
       onClick={onRecheck}
-      className="mt-4 rounded-lg border border-amber-500/30 px-3 py-1.5 text-sm text-amber-100 hover:bg-amber-500/10"
+      className="mt-4 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800"
     >
       Recheck
     </button>
@@ -76,19 +76,20 @@ function RecheckButton({ onRecheck }: { onRecheck: () => void }) {
 function StepIcon({ done, current, index }: { done: boolean; current: boolean; index: number }) {
   if (done) {
     return (
-      <span className="grid h-6 w-6 place-items-center rounded-full bg-emerald-500/15 text-xs font-bold text-emerald-300 ring-1 ring-emerald-500/30">
+      <span className="grid h-6 w-6 place-items-center rounded-full bg-emerald-500/15 text-xs font-bold text-emerald-400 ring-1 ring-emerald-500/30">
         ✓
       </span>
     );
   }
+  if (current) {
+    return (
+      <span className="grid h-6 w-6 place-items-center rounded-full bg-amber-400/20 ring-1 ring-amber-400/40">
+        <span className="h-2 w-2 rounded-full bg-amber-400" />
+      </span>
+    );
+  }
   return (
-    <span
-      className={`grid h-6 w-6 place-items-center rounded-full text-xs font-bold ring-1 ${
-        current
-          ? "bg-amber-400/20 text-amber-200 ring-amber-400/40"
-          : "bg-zinc-800 text-zinc-400 ring-zinc-700"
-      }`}
-    >
+    <span className="grid h-6 w-6 place-items-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-400 ring-1 ring-zinc-700">
       {index + 1}
     </span>
   );
@@ -166,7 +167,7 @@ function StepRow({
             <button
               onClick={runFix}
               disabled={pending}
-              className="rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
+              className="rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
             >
               {pending ? "Launching…" : step.action.label}
             </button>
@@ -179,7 +180,7 @@ function StepRow({
           </div>
         )}
 
-        {hint && <p className="mt-2 text-xs text-amber-200/80">{hint}</p>}
+        {hint && <p className="mt-2 text-xs text-zinc-400">{hint}</p>}
 
         {showManual && step.action && (
           <div className="mt-2">
