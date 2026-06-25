@@ -22,6 +22,8 @@ export function Onboarding({
   onSkip,
   groups,
   servers,
+  createdId,
+  onServerCreated,
   onStartServer,
   onOpenServer,
   onMarkInvited,
@@ -33,6 +35,8 @@ export function Onboarding({
   onSkip: () => void;
   groups: GameGroup[];
   servers: ServerSummary[] | null;
+  createdId: string | null;
+  onServerCreated: (id: string) => void;
   onStartServer: (id: string) => void;
   onOpenServer: (id: string) => void;
   onMarkInvited: () => void;
@@ -40,7 +44,6 @@ export function Onboarding({
   const [step, setStep] = useState<OnboardingStep>("welcome");
   const [showPicker, setShowPicker] = useState(false);
   const [pickerGroup, setPickerGroup] = useState<GameGroup | null>(null);
-  const [createdId, setCreatedId] = useState<string | null>(null);
   const liveServer = createdId ? servers?.find((s) => s.id === createdId) ?? null : null;
 
   return (
@@ -169,7 +172,7 @@ export function Onboarding({
           onClose={() => setPickerGroup(null)}
           onCreated={(server) => {
             setPickerGroup(null);
-            setCreatedId(server.id);
+            onServerCreated(server.id);
             onStartServer(server.id);
             setStep("live");
           }}

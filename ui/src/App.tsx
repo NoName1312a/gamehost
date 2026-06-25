@@ -130,6 +130,7 @@ export default function App() {
   const [onboardingDone, setOnboardingDone] = useState<boolean>(
     () => localStorage.getItem("gamenest.onboardingDone") === "true",
   );
+  const [onboardingServerId, setOnboardingServerId] = useState<string | null>(null);
 
   // Auth gate: loopback (desktop) is always authenticated, so this only ever
   // shows a login for remote browsers. null = unknown (don't gate yet).
@@ -179,12 +180,12 @@ export default function App() {
   // Auto-mark onboarding done for existing users (servers already present) so
   // they never see the first-run flow. Only fires on the data transition.
   useEffect(() => {
-    if (!onboardingDone && servers && servers.length > 0) {
+    if (!onboardingDone && onboardingServerId === null && servers && servers.length > 0) {
       localStorage.setItem("gamenest.onboardingDone", "true");
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setOnboardingDone(true);
     }
-  }, [onboardingDone, servers]);
+  }, [onboardingDone, onboardingServerId, servers]);
 
   async function action(id: string, label: string, fn: () => Promise<unknown>) {
     setBusy((b) => ({ ...b, [id]: label }));
@@ -208,6 +209,7 @@ export default function App() {
   function finishOnboarding() {
     localStorage.setItem("gamenest.onboardingDone", "true");
     setOnboardingDone(true);
+    setOnboardingServerId(null);
   }
 
   function markInvited() {
@@ -216,6 +218,7 @@ export default function App() {
   }
 
   const firstRun = !onboardingDone && servers !== null && servers.length === 0;
+  const showOnboarding = !onboardingDone && (firstRun || onboardingServerId !== null);
 
   if (health.status === "error") {
     return <EngineOffline error={health.error} onRetry={retry} />;
@@ -232,7 +235,7 @@ export default function App() {
     );
   }
 
-  if (firstRun) {
+  if (showOnboarding) {
     return (
       <Onboarding
         setup={setup}
@@ -242,6 +245,8 @@ export default function App() {
         onSkip={finishOnboarding}
         groups={templates.status === "ok" ? groupGames(templates.data) : []}
         servers={servers}
+        createdId={onboardingServerId}
+        onServerCreated={setOnboardingServerId}
         onStartServer={(id) => action(id, "starting…", () => api.startServer(id))}
         onOpenServer={(id) => { finishOnboarding(); setView({ kind: "server", id }); }}
         onMarkInvited={markInvited}
