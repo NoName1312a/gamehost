@@ -124,7 +124,7 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [appVer, setAppVer] = useState<string | null>(null);
   const [whatsNew, setWhatsNew] = useState<{ title: string; subtitle?: string; entries: ChangelogEntry[] } | null>(null);
-  const [invitedFriend] = useState<boolean>(
+  const [invitedFriend, setInvitedFriend] = useState<boolean>(
     () => localStorage.getItem("gamenest.invitedFriend") === "true",
   );
   const [onboardingDone, setOnboardingDone] = useState<boolean>(
@@ -210,6 +210,11 @@ export default function App() {
     setOnboardingDone(true);
   }
 
+  function markInvited() {
+    localStorage.setItem("gamenest.invitedFriend", "true");
+    setInvitedFriend(true);
+  }
+
   const firstRun = !onboardingDone && servers !== null && servers.length === 0;
 
   if (health.status === "error") {
@@ -235,6 +240,11 @@ export default function App() {
         onRecheck={retry}
         onFinish={finishOnboarding}
         onSkip={finishOnboarding}
+        groups={templates.status === "ok" ? groupGames(templates.data) : []}
+        servers={servers}
+        onStartServer={(id) => action(id, "starting…", () => api.startServer(id))}
+        onOpenServer={(id) => { finishOnboarding(); setView({ kind: "server", id }); }}
+        onMarkInvited={markInvited}
       />
     );
   }

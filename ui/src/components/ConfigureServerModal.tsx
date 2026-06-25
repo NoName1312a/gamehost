@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { api, type CreateServerRequest, type Template } from "../lib/api";
+import { api, type CreateServerRequest, type ServerSummary, type Template } from "../lib/api";
 import { editionLabel, type GameGroup } from "../lib/games";
 import { friendlyError } from "../lib/errors";
 
@@ -49,7 +49,7 @@ function OptionsForm({
 }: {
   template: Template;
   onBack?: () => void;
-  onCreated: () => void;
+  onCreated: (server: ServerSummary) => void;
 }) {
   const [name, setName] = useState(template.name);
   const [port, setPort] = useState<number>(template.ports?.[0]?.default ?? 0);
@@ -76,8 +76,8 @@ function OptionsForm({
         port,
         variables: vars,
       };
-      await api.createServer(req);
-      onCreated();
+      const created = await api.createServer(req);
+      onCreated(created);
     } catch (err) {
       setError(friendlyError(err));
       setSubmitting(false);
@@ -166,7 +166,7 @@ export function ConfigureServerModal({
 }: {
   group: GameGroup;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (server: ServerSummary) => void;
 }) {
   const multi = group.templates.length > 1;
   const [template, setTemplate] = useState<Template | null>(multi ? null : group.templates[0]);
