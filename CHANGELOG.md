@@ -9,6 +9,14 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-26
+
+### Changed
+- **"Friends can join" now runs on GameNest's own relay.** When your router lets the connection through, friends connect to you **directly** (lowest latency). When it doesn't, GameNest **automatically** routes through its own relay so they can still join — no setup, no second app, nothing to paste back.
+
+### Removed
+- The old **playit.gg** fallback is gone — sharing is fully built into GameNest now.
+
 ## [0.5.0] - 2026-06-25
 
 ### Added
