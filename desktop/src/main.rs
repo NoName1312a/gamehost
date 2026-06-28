@@ -6,10 +6,12 @@
 // still power the future Linux/Mac self-host deployment.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::io::{Read, Write};
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use tauri::{Manager, RunEvent};
+use tauri::{Emitter, Manager, RunEvent};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
@@ -54,6 +56,42 @@ fn resolve_frpc() -> Option<PathBuf> {
     candidates.into_iter().find(|p| p.is_file())
 }
 
+/// Start a one-shot loopback server on a fixed port to capture the OAuth
+/// redirect's `code` query param, then emit it to the frontend as `oauth-code`.
+/// Fixed port 8788 so the redirect URL can be allow-listed in Supabase + Discord.
+#[tauri::command]
+fn start_oauth_loopback(app: tauri::AppHandle) -> Result<u16, String> {
+    let listener = TcpListener::bind("127.0.0.1:8788")
+        .map_err(|_| "Sign-in port 8788 is busy (another GameNest instance?).".to_string())?;
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+    std::thread::spawn(move || {
+        if let Ok((mut stream, _)) = listener.accept() {
+            let mut buf = [0u8; 4096];
+            let n = stream.read(&mut buf).unwrap_or(0);
+            let req = String::from_utf8_lossy(&buf[..n]);
+            let code = req
+                .lines()
+                .next()
+                .and_then(|l| l.split_whitespace().nth(1))
+                .and_then(|path| path.split('?').nth(1))
+                .and_then(|q| q.split('&').find_map(|kv| kv.strip_prefix("code=")))
+                .map(|c| c.to_string());
+            let body = "<html><body style='font-family:sans-serif;background:#0a0a0a;color:#eee;text-align:center;padding-top:80px'><h2>\u{2713} Signed in</h2><p>You can close this tab and return to GameNest.</p></body></html>";
+            let _ = write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = stream.flush();
+            if let Some(code) = code {
+                let _ = app.emit("oauth-code", code);
+            }
+        }
+    });
+    Ok(port)
+}
+
 fn main() {
     tauri::Builder::default()
         // Single-instance must be the first plugin registered. A second launch
@@ -68,6 +106,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(EngineProcess(Mutex::new(None)))
+        .invoke_handler(tauri::generate_handler![start_oauth_loopback])
         .setup(|app| {
             let templates_dir = resolve_templates_dir(app);
 
