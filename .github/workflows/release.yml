@@ -56,3 +56,5 @@ jobs:
         run: powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Version ${{ steps.ver.outputs.version }}
         env:
           GH_TOKEN: ${{ secrets.GH_PUBLISH_TOKEN }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
