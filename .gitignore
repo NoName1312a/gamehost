@@ -31,3 +31,7 @@ desktop/gen/
 
 # brainstorming visual-companion mockups
 .superpowers/
+
+# Local env files hold real Supabase creds; .env.example is the committed template.
+.env
+.env.local
