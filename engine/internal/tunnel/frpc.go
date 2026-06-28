@@ -84,7 +84,7 @@ func writeConfig(path, frpsAddr, frpsToken string, proxies []localProxy) error {
 		b.WriteString("\n[[proxies]]\n")
 		fmt.Fprintf(&b, "name = %q\n", p.Name)
 		fmt.Fprintf(&b, "type = %q\n", p.Proto)
-		b.WriteString("localIP = \"127.0.0.1\"\n")
+		b.WriteString("localIP = \"host.docker.internal\"\n")
 		fmt.Fprintf(&b, "localPort = %d\n", p.LocalPort)
 		fmt.Fprintf(&b, "remotePort = %d\n", p.RemotePort)
 		fmt.Fprintf(&b, "metadatas.gnsecret = %q\n", p.Secret)
@@ -156,4 +156,55 @@ func (s *sidecar) pid() int {
 		return s.cmd.Process.Pid
 	}
 	return 0
+}
+
+// --- Docker-based supervisor -------------------------------------------------
+//
+// A native frpc.exe is unreliable on Windows: it isn't always bundled, and
+// Smart App Control / Defender frequently block frp binaries as low-reputation
+// (frp is widely used by malware). Since GameNest already requires Docker for
+// game servers, we run frpc as a container instead — nothing for Windows to
+// block, nothing to bundle or code-sign. The frpc.toml's directory is mounted
+// into the container, which reaches the host's published game ports via
+// host.docker.internal (see writeConfig).
+const (
+	frpcImage     = "snowdreamtech/frpc:0.69.1" // matches the relay's frps 0.69.1
+	frpcContainer = "gamehost-frpc"
+)
+
+// dockerSidecar supervises frpc as a Docker container via the docker CLI.
+type dockerSidecar struct {
+	mu sync.Mutex
+}
+
+// restart removes any previous frpc container and starts a fresh one bound to
+// the config in cfgPath's directory.
+func (d *dockerSidecar) restart(cfgPath string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_ = execCommand("docker", "rm", "-f", frpcContainer).Run() // clear stale instance
+	dir := filepath.Dir(cfgPath)
+	return execCommand("docker", "run", "-d",
+		"--name", frpcContainer,
+		"--restart", "unless-stopped",
+		"--pull", "missing",
+		"--add-host", "host.docker.internal:host-gateway",
+		"-v", dir+":/etc/frp",
+		frpcImage,
+	).Run()
+}
+
+// stop removes the frpc container, if any.
+func (d *dockerSidecar) stop() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_ = execCommand("docker", "rm", "-f", frpcContainer).Run()
+}
+
+// isRunning reports whether the frpc container is up.
+func (d *dockerSidecar) isRunning() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	out, err := execCommand("docker", "inspect", "-f", "{{.State.Running}}", frpcContainer).Output()
+	return err == nil && strings.TrimSpace(string(out)) == "true"
 }

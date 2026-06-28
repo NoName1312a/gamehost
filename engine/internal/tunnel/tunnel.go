@@ -50,7 +50,7 @@ type Agent struct {
 // New returns an Agent that talks to the control-plane at baseURL and stores its
 // token + frpc config under dataDir.
 func New(dataDir, baseURL string) *Agent {
-	return newAgent(NewClient(baseURL, dataDir), &sidecar{bin: locate()}, dataDir)
+	return newAgent(NewClient(baseURL, dataDir), &dockerSidecar{}, dataDir)
 }
 
 func newAgent(c *Client, sup supervisor, dataDir string) *Agent {
@@ -58,7 +58,7 @@ func newAgent(c *Client, sup supervisor, dataDir string) *Agent {
 		client:  c,
 		sup:     sup,
 		dataDir: dataDir,
-		cfgPath: filepath.Join(dataDir, "frpc.toml"),
+		cfgPath: filepath.Join(dataDir, "tunnel", "frpc.toml"),
 		current: map[string]Allocation{},
 	}
 }

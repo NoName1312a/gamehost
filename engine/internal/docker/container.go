@@ -70,12 +70,20 @@ func (r *Runtime) run(ctx context.Context, args ...string) (string, error) {
 // so it can be unit-tested without a running Docker engine. Env keys are sorted
 // for deterministic output.
 func RunArgs(spec CreateSpec) []string {
-	args := []string{"run", "-d", "--name", spec.Name, "--restart", "unless-stopped"}
+	args := []string{"run", "-d", "--name", spec.Name, "--restart", "on-failure:3"}
 	if spec.OpenStdin {
 		args = append(args, "-i")
 	}
 	if spec.MemoryMB > 0 {
-		args = append(args, "-m", fmt.Sprintf("%dm", spec.MemoryMB))
+		// The container limit must exceed the app's JVM heap (the itzg image's
+		// MEMORY env): heap + JVM/native overhead has to fit under the cgroup or
+		// the container OOM-kills mid-load (a 6G modpack heap in a 6G limit dies).
+		// Give headroom above the configured heap when they'd otherwise collide.
+		limit := spec.MemoryMB
+		if heap := heapMB(spec.Env["MEMORY"]); heap > 0 && limit < heap+memHeadroomMB {
+			limit = heap + memHeadroomMB
+		}
+		args = append(args, "-m", fmt.Sprintf("%dm", limit))
 	}
 	if spec.CPUs > 0 {
 		args = append(args, "--cpus", strconv.FormatFloat(spec.CPUs, 'f', -1, 64))
@@ -104,6 +112,31 @@ func RunArgs(spec CreateSpec) []string {
 	}
 	args = append(args, spec.Image)
 	return args
+}
+
+// memHeadroomMB is the extra container memory granted above the JVM heap so the
+// heap plus native/GC overhead fits under the cgroup limit (avoids OOM-kill).
+const memHeadroomMB = 2048
+
+// heapMB parses an itzg-style memory value ("6G", "6144M", "6144") to mebibytes;
+// it returns 0 for an empty or unparseable value.
+func heapMB(s string) int {
+	s = strings.ToUpper(strings.TrimSpace(s))
+	if s == "" {
+		return 0
+	}
+	mult := 1
+	switch s[len(s)-1] {
+	case 'G':
+		mult, s = 1024, s[:len(s)-1]
+	case 'M':
+		mult, s = 1, s[:len(s)-1]
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(s))
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n * mult
 }
 
 // Run creates and starts a container from a spec (pulls the image if missing).

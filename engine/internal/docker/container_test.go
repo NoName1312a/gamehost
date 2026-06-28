@@ -18,7 +18,7 @@ func TestRunArgs(t *testing.T) {
 	}
 
 	got := strings.Join(RunArgs(spec), " ")
-	want := "run -d --name gamehost-abc123 --restart unless-stopped -i -m 4096m " +
+	want := "run -d --name gamehost-abc123 --restart on-failure:3 -i -m 6144m " +
 		"--pids-limit 4096 --ulimit nofile=1048576:1048576 " +
 		"-e EULA=TRUE -e MEMORY=4G -e TYPE=PAPER " +
 		"-p 25565:25565/tcp -v gamehost-abc123-data:/data itzg/minecraft-server:latest"
@@ -35,7 +35,7 @@ func TestRunArgsDefaultsProtocolAndSkipsEmpty(t *testing.T) {
 		Ports: []PortMapping{{Host: 2456, Container: 2456}}, // no protocol -> tcp
 	}
 	got := strings.Join(RunArgs(spec), " ")
-	want := "run -d --name gamehost-x --restart unless-stopped " +
+	want := "run -d --name gamehost-x --restart on-failure:3 " +
 		"--pids-limit 4096 --ulimit nofile=1048576:1048576 -p 2456:2456/tcp alpine"
 	if got != want {
 		t.Fatalf("RunArgs mismatch:\n got: %s\nwant: %s", got, want)

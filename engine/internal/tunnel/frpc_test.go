@@ -47,7 +47,7 @@ auth.token = "frps-tok"
 [[proxies]]
 name = "gn-myserver-game"
 type = "udp"
-localIP = "127.0.0.1"
+localIP = "host.docker.internal"
 localPort = 25565
 remotePort = 30001
 metadatas.gnsecret = "s3cr3t"
@@ -55,7 +55,7 @@ metadatas.gnsecret = "s3cr3t"
 [[proxies]]
 name = "gn-other-game"
 type = "tcp"
-localIP = "127.0.0.1"
+localIP = "host.docker.internal"
 localPort = 2456
 remotePort = 30002
 metadatas.gnsecret = "other-secret"

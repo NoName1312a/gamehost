@@ -258,11 +258,21 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
   // header without a preflight that fails for non-allow-listed origins.
   const headers: Record<string, string> = { "X-GameNest": "1" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const res = await fetch(`${ENGINE_BASE}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  // Abort a hung request after a timeout so a stuck call can't permanently
+  // disable the UI — e.g. leave a server's Stop/Delete buttons greyed out.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 45000);
+  let res: Response;
+  try {
+    res = await fetch(`${ENGINE_BASE}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) throw new Error(await parseError(res, path));
   const text = await res.text();
   return (text ? JSON.parse(text) : null) as T;
