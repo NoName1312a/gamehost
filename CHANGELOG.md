@@ -9,6 +9,13 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-28
+
+### Fixed
+- **"Friends can join" now works out of the box.** The relay tunnel runs alongside your servers instead of as a separate program that Windows often blocked — no setup, no pasting addresses, it just works.
+- **Modpack servers no longer crash-loop or run out of memory.** A server that fails to start now stops cleanly instead of restarting forever, and servers get extra memory headroom so large modpacks aren't killed mid-load.
+- **You can always delete a server** — even one that's stuck or stopped responding.
+
 ## [0.6.0] - 2026-06-26
 
 ### Changed
