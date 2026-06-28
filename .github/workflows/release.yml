@@ -1,0 +1,58 @@
+name: Release
+
+# Builds + publishes a GameNest release from the cloud (clean Windows runner,
+# no Smart App Control), so releases never depend on a dev machine's state.
+# Trigger by pushing a tag like `v0.6.1` (version is taken from the tag and must
+# match desktop/tauri.conf.json), or run manually via "Run workflow".
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 0.6.1 (must match tauri.conf.json)"
+        required: true
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+          cache-dependency-path: engine/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install UI dependencies
+        run: npm --prefix ui ci
+
+      - name: Restore the updater signing key
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.tauri" | Out-Null
+          [System.IO.File]::WriteAllText("$env:USERPROFILE\.tauri\gamehost-updater.key", $env:TAURI_UPDATER_KEY)
+        env:
+          TAURI_UPDATER_KEY: ${{ secrets.TAURI_UPDATER_KEY }}
+
+      - name: Build, sign manifest, and publish
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Version ${{ steps.ver.outputs.version }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_PUBLISH_TOKEN }}
