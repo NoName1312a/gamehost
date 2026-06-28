@@ -25,6 +25,8 @@ import { Dashboard } from "./components/Dashboard";
 import { Account } from "./components/Account";
 import { GetStartedChecklist } from "./components/GetStartedChecklist";
 import { Onboarding } from "./components/Onboarding";
+import { AuthProvider } from "./lib/auth";
+import { SocialSidebar } from "./components/social/SocialSidebar";
 
 // ---- tiny async helper -----------------------------------------------------
 
@@ -95,7 +97,7 @@ type View =
 
 // ---- app -------------------------------------------------------------------
 
-export default function App() {
+function AppInner() {
   const [nonce, setNonce] = useState(0);
   const [tick, setTick] = useState(0);
   const retry = () => setNonce((n) => n + 1);
@@ -338,6 +340,7 @@ export default function App() {
             </div>
           )}
         </main>
+        <SocialSidebar />
       </div>
 
       {/* Overlays — GamePicker, ConfigureServerModal, Changelog, toast */}
@@ -454,4 +457,12 @@ go run ./cmd/engine`}
       </div>
     </div>
   );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  )
 }
