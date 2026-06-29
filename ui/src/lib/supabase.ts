@@ -21,12 +21,13 @@ export interface Profile {
   avatar_url: string | null
   level: number
   xp: number
+  show_activity: boolean
 }
 
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data } = await supabase
     .from('profiles')
-    .select('id, username, display_name, avatar_url, level, xp')
+    .select('id, username, display_name, avatar_url, level, xp, show_activity')
     .eq('id', userId)
     .maybeSingle()
   return (data as Profile | null) ?? null

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ProfileBlock } from './ProfileBlock'
 
-const profile = { id: 'u1', username: 'Tom', display_name: null, avatar_url: null, level: 3, xp: 1240 }
+const profile = { id: 'u1', username: 'Tom', display_name: null, avatar_url: null, level: 3, xp: 1240, show_activity: true }
 
 describe('ProfileBlock', () => {
   it('shows username and level', () => {
