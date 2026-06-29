@@ -1,7 +1,8 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { supabase } from './supabase'
 import { useAuth } from './auth'
 import { api } from './api'
+import { awardXp } from './xp'
 
 const HEARTBEAT_MS = 30_000
 
@@ -19,6 +20,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const { session, profile } = useAuth()
   const userId = session?.user.id
   const enabled = !!userId && profile?.show_activity !== false
+  const wasHosting = useRef(false)
 
   useEffect(() => {
     if (!userId) return
@@ -29,6 +31,9 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     let alive = true
     const beat = async () => {
       const activity = await currentActivity()
+      const hosting = activity !== null
+      if (hosting && !wasHosting.current) void awardXp(25)
+      wasHosting.current = hosting
       if (alive) await supabase.from('presence').upsert({ user_id: userId, activity, updated_at: new Date().toISOString() })
     }
     void beat()

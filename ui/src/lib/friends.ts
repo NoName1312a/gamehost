@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { awardXp } from './xp'
 
 const ONLINE_MS = 60_000
 
@@ -69,6 +70,7 @@ export async function sendRequest(username: string): Promise<void> {
 export async function acceptRequest(id: string): Promise<void> {
   const { error } = await supabase.from('friendships').update({ status: 'accepted', responded_at: new Date().toISOString() }).eq('id', id)
   if (error) throw new Error(error.message)
+  void awardXp(50)
 }
 
 export async function removeFriendship(id: string): Promise<void> {

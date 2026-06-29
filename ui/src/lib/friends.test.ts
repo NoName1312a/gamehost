@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { sb } = vi.hoisted(() => ({ sb: { auth: { getSession: vi.fn() }, from: vi.fn() } }))
+const { sb, awardXp } = vi.hoisted(() => ({ sb: { auth: { getSession: vi.fn() }, from: vi.fn() }, awardXp: vi.fn() }))
 vi.mock('./supabase', () => ({ supabase: sb }))
-import { sendRequest } from './friends'
+vi.mock('./xp', () => ({ awardXp }))
+import { sendRequest, acceptRequest } from './friends'
 
 beforeEach(() => {
   sb.auth.getSession.mockResolvedValue({ data: { session: { user: { id: 'me' } } } })
@@ -37,5 +38,14 @@ describe('sendRequest', () => {
     })
     await sendRequest('Them')
     expect(insert).toHaveBeenCalledWith({ requester: 'me', addressee: 'them', status: 'pending' })
+  })
+})
+
+describe('acceptRequest', () => {
+  it('awards XP after accepting a request', async () => {
+    const eq = vi.fn(async () => ({ error: null }))
+    sb.from.mockImplementation((t: string) => (t === 'friendships' ? { update: () => ({ eq }) } : {}))
+    await acceptRequest('r1')
+    expect(awardXp).toHaveBeenCalledWith(50)
   })
 })

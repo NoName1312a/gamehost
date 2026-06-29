@@ -28,9 +28,9 @@ export function SocialSidebar() {
     if (!session) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshRequestCount()
-    const t = setInterval(() => { bump(); void refreshRequestCount() }, 15_000)
+    const t = setInterval(() => { bump(); void refreshRequestCount(); void refreshProfile() }, 15_000)
     return () => clearInterval(t)
-  }, [session, bump, refreshRequestCount])
+  }, [session, bump, refreshRequestCount, refreshProfile])
 
   return (
     <aside className="hidden w-72 shrink-0 flex-col border-l border-zinc-800/80 bg-zinc-950/60 p-4 backdrop-blur lg:flex">
