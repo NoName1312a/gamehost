@@ -9,6 +9,13 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-06-29
+
+### Added
+- **Accounts (optional).** Sign in with Discord or email to unlock the new social features. Hosting and "friends can join" still work with no account at all.
+- **Friends.** Add friends by username, then see who's online and what they're hosting — right from the sidebar.
+- **Levels.** Earn XP for hosting servers and connecting with friends, and level up your profile.
+
 ## [0.6.1] - 2026-06-28
 
 ### Fixed
