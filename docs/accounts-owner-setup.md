@@ -22,4 +22,8 @@ For local dev, copy `ui/.env.example` to `ui/.env` with the same values.
 3. Confirm the email provider settings (email confirmation on/off) — if on, sign-up shows a "check your email" state.
 
 ## 4. Database
-Apply `supabase/migrations/0001_profiles.sql` to the project (dashboard SQL editor or Supabase MCP `apply_migration`).
+Apply the migrations to the project, in order (dashboard SQL editor or Supabase MCP `apply_migration`):
+1. `supabase/migrations/0001_profiles.sql` — accounts (profiles + RLS + signup trigger).
+2. `supabase/migrations/0002_friends_presence.sql` — friends + presence tables (RLS) and the `profiles.show_activity` privacy column.
+
+No new providers or secrets beyond section 1 are needed for friends/presence.
