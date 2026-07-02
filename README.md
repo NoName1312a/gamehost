@@ -3,12 +3,15 @@
 **Host game servers for you and your friends — free, open source, and dead simple.**
 
 GameNest is a Windows desktop app that runs **Minecraft (Java & Bedrock), Valheim,
-CS2, Rust and more** in one click. It solves the part everyone gets stuck on —
-*"my friends can't connect"* — with automatic **UPnP port-forwarding** and a
-**relay fallback** for tricky routers/CGNAT, so you get a shareable address without
-touching your router settings.
+CS2, Rust, Palworld and more** in one click. It solves the part everyone gets stuck
+on — *"my friends can't connect"* — with automatic **UPnP port-forwarding** and a
+**built-in tunnel fallback** for tricky routers/CGNAT, so you get a shareable
+address without touching your router settings.
+
+**Website: [gamenest.cc](https://gamenest.cc)**
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/NoName1312a/gamehost-releases?label=release)](https://github.com/NoName1312a/gamehost-releases/releases/latest)
 ![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078D6)
 ![Free & open source](https://img.shields.io/badge/free%20%26%20open%20source-yes-brightgreen)
 
@@ -25,13 +28,17 @@ Go **engine** daemon and a React **control panel**, wrapped in a native Tauri
 desktop window that auto-launches the engine. No terminal, no config files, no
 self-hosting knowledge required.
 
-- **One-click servers** — pick a game, name it, go. ~28 game templates.
-- **Friends can actually connect** — automatic UPnP + playit.gg relay fallback, with
-  a copy-paste connect address.
+- **One-click servers** — pick a game, name it, go. 28 game templates.
+- **Friends can actually connect** — direct via automatic UPnP when your router
+  allows it, with a seamless fallback through GameNest's built-in tunnel when it
+  doesn't (CGNAT, hotel Wi-Fi, stubborn ISPs). One copy-paste connect address.
 - **Backups & schedules** — daily restart/backup times and off-site copies to a NAS,
   external drive, or synced cloud folder.
 - **Minecraft mod manager** — paste [Modrinth](https://modrinth.com) slugs; mods
   install automatically on next start.
+- **Friends, presence & levels (optional)** — sign in with Discord or email to add
+  friends, see who's online and what they're hosting, and level up as you host.
+  Entirely optional: anonymous hosting stays the default, no account required.
 - **Runs locally & private** — the engine binds to `127.0.0.1`; your data stays on
   your machine.
 
@@ -46,7 +53,7 @@ The app guides you through a one-time Docker setup on first launch.
 
 ## Build from source
 
-**Prereqs:** Go 1.22+, Node 20+. Docker Desktop is only needed once you actually run
+**Prereqs:** Go 1.25+, Node 20+. Docker Desktop is only needed once you actually run
 a game server.
 
 ```bash
