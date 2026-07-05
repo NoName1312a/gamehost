@@ -124,7 +124,9 @@ export function GamePicker({
         <div ref={listRef} className="flex-1 overflow-y-auto overscroll-contain p-2">
           {results.length === 0 ? (
             <p className="px-3 py-10 text-center text-sm text-zinc-500">
-              No games match “{query.trim()}”.
+              {query.trim()
+                ? <>No games match “{query.trim()}”.</>
+                : "The game library is empty — GameNest couldn't load its game templates. Reinstalling usually fixes this."}
             </p>
           ) : (
             results.map((g, i) => (
