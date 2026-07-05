@@ -46,9 +46,25 @@ func envOr(key, def string) string {
 	return def
 }
 
-// defaultTemplatesDir finds the repo's templates/ folder when running via
-// `go run ./cmd/engine` from the engine/ directory (templates live one level up).
+// defaultTemplatesDir locates the game templates. Installed app first: the
+// engine binary sits in the install root with the bundled templates at
+// resources/templates beside it, and the exe path is the only reliable anchor
+// there (cwd depends on how the OS launched us, and the desktop shell's
+// GAMEHOST_TEMPLATES env plumbing must not be a single point of failure).
+// Dev fallback: the repo's templates/ folder relative to the working directory
+// (`go run ./cmd/engine` from engine/ — templates live one level up).
 func defaultTemplatesDir() string {
+	if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		for _, cand := range []string{
+			filepath.Join(dir, "resources", "templates"),
+			filepath.Join(dir, "templates"),
+		} {
+			if fi, err := os.Stat(cand); err == nil && fi.IsDir() {
+				return cand
+			}
+		}
+	}
 	if wd, err := os.Getwd(); err == nil {
 		for _, cand := range []string{
 			filepath.Join(wd, "templates"),
