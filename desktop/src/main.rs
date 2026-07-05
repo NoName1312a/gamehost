@@ -25,6 +25,9 @@ struct EngineProcess(Mutex<Option<CommandChild>>);
 fn resolve_templates_dir(app: &tauri::App) -> Option<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
     if let Ok(res) = app.path().resource_dir() {
+        // Bundled resources keep their tauri.conf.json-relative path, so the
+        // "resources/templates/*" entry lands at <resource_dir>/resources/templates.
+        candidates.push(res.join("resources").join("templates"));
         candidates.push(res.join("templates"));
     }
     // Dev fallbacks — these paths only exist on the build machine.
