@@ -9,6 +9,12 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-07-05
+
+### Fixed
+- **"Add server" listed no games on installed builds.** The app couldn't find its bundled game library (it looked in the wrong folder, and releases built in CI lost the fallback that masked this on the dev machine). The engine now also finds templates sitting right next to it, so the picker reliably shows all 28 games.
+- The game picker now says when the library is empty instead of showing "No games match".
+
 ## [0.6.5] - 2026-06-29
 
 ### Added
