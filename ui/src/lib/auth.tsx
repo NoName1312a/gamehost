@@ -7,7 +7,6 @@ interface AuthState {
   profile: Profile | null
   loading: boolean
   signInEmail: (email: string, password: string) => Promise<void>
-  signUpEmail: (email: string, password: string, username: string) => Promise<void>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -43,16 +42,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error(error.message)
   }, [])
 
-  const signUpEmail = useCallback(async (email: string, password: string, username: string) => {
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { username } } })
-    if (error) throw new Error(error.message)
-  }, [])
-
   const signOut = useCallback(async () => { await supabase.auth.signOut() }, [])
   const refreshProfile = useCallback(() => loadProfile(session), [loadProfile, session])
 
   return (
-    <Ctx.Provider value={{ session, profile, loading, signInEmail, signUpEmail, signOut, refreshProfile }}>
+    <Ctx.Provider value={{ session, profile, loading, signInEmail, signOut, refreshProfile }}>
       {children}
     </Ctx.Provider>
   )

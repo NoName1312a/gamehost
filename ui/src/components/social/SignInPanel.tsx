@@ -1,15 +1,14 @@
 import { useState, type FormEvent } from 'react'
+import { open } from '@tauri-apps/plugin-shell'
 import { useAuth } from '../../lib/auth'
 import { signInWithDiscord } from '../../lib/discord-oauth'
-import { validateUsername, isUsernameAvailable } from '../../lib/username'
 import { friendlyError } from '../../lib/errors'
+import { WEB_BASE } from '../../lib/site'
 
 export function SignInPanel({ onClose }: { onClose: () => void }) {
-  const { signInEmail, signUpEmail } = useAuth()
-  const [mode, setMode] = useState<'in' | 'up'>('in')
+  const { signInEmail } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [username, setUsername] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -18,14 +17,7 @@ export function SignInPanel({ onClose }: { onClose: () => void }) {
     setErr(null)
     setBusy(true)
     try {
-      if (mode === 'up') {
-        const v = validateUsername(username)
-        if (v) throw new Error(v)
-        if (!(await isUsernameAvailable(username))) throw new Error('That username is taken.')
-        await signUpEmail(email, password, username)
-      } else {
-        await signInEmail(email, password)
-      }
+      await signInEmail(email, password)
       onClose()
     } catch (e) {
       setErr(friendlyError(e))
@@ -51,7 +43,7 @@ export function SignInPanel({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-6" onClick={onClose}>
       <div className="panel w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
         <h2 className="font-display mb-4 text-center text-base font-semibold text-zinc-100">
-          Welcome to GameNest
+          Sign in to GameNest
         </h2>
         <button
           onClick={discord}
@@ -64,14 +56,6 @@ export function SignInPanel({ onClose }: { onClose: () => void }) {
           <div className="h-px flex-1 bg-zinc-800" /> or <div className="h-px flex-1 bg-zinc-800" />
         </div>
         <form onSubmit={submit} className="flex flex-col gap-2">
-          {mode === 'up' && (
-            <input
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-emerald-500"
-            />
-          )}
           <input
             placeholder="Email"
             type="email"
@@ -92,15 +76,15 @@ export function SignInPanel({ onClose }: { onClose: () => void }) {
             disabled={busy}
             className="mt-1 w-full rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
           >
-            {mode === 'up' ? 'Create account' : 'Sign in with email'}
+            Sign in with email
           </button>
         </form>
         <p className="mt-3 text-center text-xs text-zinc-500">
-          {mode === 'in' ? (
-            <>No account? <button className="text-emerald-400" onClick={() => setMode('up')}>Create one</button></>
-          ) : (
-            <>Have an account? <button className="text-emerald-400" onClick={() => setMode('in')}>Sign in</button></>
-          )}
+          <button className="text-emerald-400" onClick={() => open(`${WEB_BASE}/reset`)}>Forgot password?</button>
+        </p>
+        <p className="mt-1 text-center text-xs text-zinc-500">
+          No account?{' '}
+          <button className="text-emerald-400" onClick={() => open(`${WEB_BASE}/signup`)}>Create one on the web</button>
         </p>
       </div>
     </div>

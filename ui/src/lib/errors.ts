@@ -29,6 +29,10 @@ const RULES: Rule[] = [
     message: "Permission denied. Try running GameNest as administrator.",
   },
   {
+    match: /email not confirmed|email_not_confirmed/i,
+    message: "Please confirm your email — check your inbox for the confirmation link.",
+  },
+  {
     match: /authentication required|unauthorized|\b401\b/i,
     message: "You're signed out. Sign in again and retry.",
   },
