@@ -13,6 +13,11 @@ import (
 // desktop user) and requires a valid session for everything else. With the
 // engine bound to loopback (desktop default) requireAuth never rejects; it only
 // bites once the engine is exposed on a network (remote-access mode).
+//
+// Loopback trust additionally requires a loopback Host header (see
+// loopbackTrusted / hostGuard). Without it, a DNS-rebinding page — which rebinds
+// its own domain to 127.0.0.1 so its requests reach the engine over a loopback
+// socket while still carrying its attacker Host — would inherit owner trust.
 
 const sessionCookie = "gh_session"
 const sessionTTL = 7 * 24 * time.Hour
@@ -32,6 +37,33 @@ func clientIP(remoteAddr string) string {
 	return host
 }
 
+// hostIsLoopback reports whether an HTTP Host header names a loopback address
+// ("localhost", 127.0.0.0/8, or ::1). The desktop UI always addresses the engine
+// at a loopback host; a DNS-rebinding page cannot forge one, because the browser
+// derives Host from the request URL's authority (its rebound domain).
+func hostIsLoopback(host string) bool {
+	if host == "" {
+		return false
+	}
+	h, _, err := net.SplitHostPort(host)
+	if err != nil {
+		h = host // no port present
+	}
+	h = strings.Trim(h, "[]") // unwrap a bracketed IPv6 literal
+	if strings.EqualFold(h, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsLoopback()
+}
+
+// loopbackTrusted reports whether a request may act as the local owner without a
+// session: it must arrive over a loopback socket AND address a loopback Host. The
+// Host check is what defeats DNS rebinding (see hostGuard).
+func (a *API) loopbackTrusted(r *http.Request) bool {
+	return isLoopback(r.RemoteAddr) && hostIsLoopback(r.Host)
+}
+
 // sessionToken returns the caller's session token from the cookie or an
 // Authorization: Bearer header, or "".
 func sessionToken(r *http.Request) string {
@@ -45,15 +77,16 @@ func sessionToken(r *http.Request) string {
 	return ""
 }
 
-// authed reports whether the request is allowed: loopback or a valid session.
+// authed reports whether the request is allowed: trusted loopback or a valid
+// session.
 func (a *API) authed(r *http.Request) bool {
-	return isLoopback(r.RemoteAddr) || a.auth.ValidateSession(sessionToken(r))
+	return a.loopbackTrusted(r) || a.auth.ValidateSession(sessionToken(r))
 }
 
 // effectiveUser returns the acting account's username and role. Loopback (the
 // local desktop user) is treated as the owner.
 func (a *API) effectiveUser(r *http.Request) (username, role string) {
-	if isLoopback(r.RemoteAddr) {
+	if a.loopbackTrusted(r) {
 		return "owner", auth.RoleOwner
 	}
 	if u, ok := a.auth.SessionUsername(sessionToken(r)); ok {
@@ -88,7 +121,7 @@ func (a *API) authStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"authenticated": a.authed(r),
 		"hasPassword":   a.auth.HasPassword(),
-		"loopback":      isLoopback(r.RemoteAddr),
+		"loopback":      a.loopbackTrusted(r),
 		"user":          user,
 		"role":          role,
 	})

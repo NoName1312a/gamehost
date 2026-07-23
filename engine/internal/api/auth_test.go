@@ -21,6 +21,7 @@ func req(t *testing.T, h http.Handler, method, path, remote, body string, cookie
 		r = httptest.NewRequest(method, path, strings.NewReader(body))
 	}
 	r.RemoteAddr = remote
+	r.Host = "127.0.0.1:8723"     // the UI addresses the engine at a loopback host
 	r.Header.Set(csrfHeader, "1") // legit client (the UI) always sends this
 	for _, c := range cookies {
 		r.AddCookie(c)

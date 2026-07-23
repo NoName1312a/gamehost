@@ -83,6 +83,9 @@ func NewRouter(d Deps) http.Handler {
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
+	// Anti-DNS-rebinding: a loopback request must also carry a loopback Host,
+	// else it can't inherit local-owner trust (see hostGuard).
+	r.Use(a.hostGuard)
 	// Anti-CSRF: mutating requests must carry the csrfHeader (see csrfGuard).
 	r.Use(a.csrfGuard)
 

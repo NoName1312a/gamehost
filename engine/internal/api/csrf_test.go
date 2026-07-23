@@ -13,6 +13,7 @@ func rawLoopback(t *testing.T, h http.Handler, method, path string) *httptest.Re
 	t.Helper()
 	r := httptest.NewRequest(method, path, nil)
 	r.RemoteAddr = "127.0.0.1:50000"
+	r.Host = "127.0.0.1:8723" // loopback host; this suite exercises the CSRF guard, not hostGuard
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, r)
 	return rec

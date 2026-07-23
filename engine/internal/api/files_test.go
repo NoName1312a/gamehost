@@ -93,6 +93,7 @@ func TestWriteFileRejectsOversizedBody(t *testing.T) {
 	body := `{"path":"server.properties","content":"` + huge + `"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/servers/"+s.ID+"/files", strings.NewReader(body))
 	req.RemoteAddr = "127.0.0.1:50000" // loopback: the desktop case
+	req.Host = "127.0.0.1:8723"        // loopback host, as the UI sends
 	req.Header.Set(csrfHeader, "1")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

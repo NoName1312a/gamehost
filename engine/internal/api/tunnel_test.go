@@ -75,6 +75,7 @@ func TestTunnelStatusNotConfigured(t *testing.T) {
 	h, _, _ := newTestAPI(t) // Deps carries no Tunnel -> nil agent
 	req := httptest.NewRequest(http.MethodGet, "/api/system/tunnel", nil)
 	req.RemoteAddr = "127.0.0.1:50000"
+	req.Host = "127.0.0.1:8723"
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -111,6 +112,7 @@ func TestSetUseTunnelTogglesFlag(t *testing.T) {
 	}
 	req := httptest.NewRequest(http.MethodPut, "/api/servers/"+s.ID+"/use-tunnel", strings.NewReader(`{"on":true}`))
 	req.RemoteAddr = "127.0.0.1:50000"
+	req.Host = "127.0.0.1:8723"
 	req.Header.Set(csrfHeader, "1")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

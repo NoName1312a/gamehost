@@ -21,6 +21,7 @@ func do(t *testing.T, h http.Handler, method, path, body string) *httptest.Respo
 		r = httptest.NewRequest(method, path, strings.NewReader(body))
 	}
 	r.RemoteAddr = "127.0.0.1:50000"
+	r.Host = "127.0.0.1:8723"     // the UI addresses the engine at a loopback host
 	r.Header.Set(csrfHeader, "1") // legit client (the UI) always sends this
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, r)
