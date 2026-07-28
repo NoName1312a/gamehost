@@ -51,6 +51,24 @@ most important decision: it lets the *same* engine power both the desktop app
   (`gamehost-releases` repo's `latest.json`) on launch + from Settings, and
   installs signed updates one-click. Releases are cut with `scripts/release.ps1`
   (signs with a local key — never committed; pubkey is in `tauri.conf.json`).
+- **Webview CSP** (`app.security.csp` in `tauri.conf.json`). The Supabase JWT
+  lives in `localStorage`, so the policy exists to stop a compromised npm
+  dependency from loading remote code or phoning the token home. Reasoning
+  behind each directive, since JSON can't hold comments:
+  - `script-src 'self'` — the Vite build emits no inline scripts (one external
+    module + one stylesheet), so no nonce or `'unsafe-inline'` is needed. If a
+    future build starts inlining, this breaks loudly rather than silently.
+  - `style-src 'self' 'unsafe-inline'` — required by the handful of
+    `style={{ width }}` progress bars.
+  - `img-src 'self' data: https:` — deliberately wide: profile avatars are
+    arbitrary user-supplied URLs and cover art comes from Steam's CDN.
+  - `connect-src` is the tight one — the local engine over HTTP **and** WS,
+    Tauri's IPC, and Supabase (REST + realtime). Nothing else.
+
+  Changing the engine port, the Supabase project, or adding any outbound call
+  means updating this string. **Smoke-test the app under `tauri dev` after
+  touching it** — a CSP mistake surfaces at runtime in the webview console, not
+  at build time.
 
 ## Why Docker-per-game
 One container per server gives isolation, per-server CPU/RAM limits, clean
