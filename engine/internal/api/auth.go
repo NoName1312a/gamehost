@@ -97,10 +97,24 @@ func (a *API) effectiveUser(r *http.Request) (username, role string) {
 	return "", ""
 }
 
-// requireOwner reports whether the caller may manage users.
+// requireOwner reports whether the caller holds the owner role.
 func (a *API) requireOwner(r *http.Request) bool {
 	_, role := a.effectiveUser(r)
 	return role == auth.RoleOwner
+}
+
+// requireOwnerRole is middleware for routes only the owner may call. Admin and
+// operator accounts exist to run game servers; this keeps machine-wide and
+// destructive actions out of their reach once remote access is on and such an
+// account has been handed to someone else.
+func (a *API) requireOwnerRole(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !a.requireOwner(r) {
+			writeJSON(w, http.StatusForbidden, errMsg("only the owner can do this"))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // requireAuth is middleware that gates protected routes.

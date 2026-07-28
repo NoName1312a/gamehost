@@ -106,29 +106,41 @@ func NewRouter(d Deps) http.Handler {
 			r.Post("/auth/password", a.authSetPassword)
 
 			r.Get("/license", a.licenseStatus)
-			r.Post("/license", a.setLicense)
-			r.Delete("/license", a.clearLicense)
-
 			r.Get("/account", a.accountStatus)
-			r.Post("/account/link", a.linkAccount)
-			r.Delete("/account/link", a.unlinkAccount)
-
 			r.Get("/users", a.listUsers)
-			r.Post("/users", a.addUser)
-			r.Delete("/users/{username}", a.deleteUser)
 
 			r.Get("/system/runtime", a.runtime)
 			r.Get("/system/setup", a.setupReport)
-			r.Post("/system/setup/{step}", a.runSetupStep)
 			r.Get("/system/network", a.networkStatus)
 			r.Get("/system/remote-access", a.remoteAccessStatus)
-			r.Post("/system/remote-access", a.setRemoteAccess)
 			r.Get("/system/offsite", a.offsiteStatus)
-			r.Post("/system/offsite", a.setOffsite)
 			r.Get("/system/telemetry", a.telemetryStatus)
-			r.Post("/system/telemetry", a.setTelemetry)
-			r.Post("/system/purge", a.purgeData)
 			r.Get("/system/tunnel", a.tunnelStatus)
+
+			// Owner-only: destructive or machine-wide actions. Admin and
+			// operator accounts are for running game servers (below) — they
+			// must not be able to wipe the install, expose the engine to the
+			// network, write backups to an arbitrary host directory, run
+			// elevated setup steps, or change who this install belongs to.
+			// Loopback is the owner, so the local desktop app is unaffected.
+			r.Group(func(r chi.Router) {
+				r.Use(a.requireOwnerRole)
+
+				r.Post("/users", a.addUser)
+				r.Delete("/users/{username}", a.deleteUser)
+
+				r.Post("/license", a.setLicense)
+				r.Delete("/license", a.clearLicense)
+
+				r.Post("/account/link", a.linkAccount)
+				r.Delete("/account/link", a.unlinkAccount)
+
+				r.Post("/system/setup/{step}", a.runSetupStep)
+				r.Post("/system/remote-access", a.setRemoteAccess)
+				r.Post("/system/offsite", a.setOffsite)
+				r.Post("/system/telemetry", a.setTelemetry)
+				r.Post("/system/purge", a.purgeData)
+			})
 
 			r.Get("/templates", a.listTemplates)
 			r.Get("/templates/{id}", a.getTemplate)
