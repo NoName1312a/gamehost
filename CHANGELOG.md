@@ -9,6 +9,15 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-07-28
+
+### Security
+- **A malicious website could take over your servers just by being visited.** The engine trusted any request that reached it locally, so a web page could quietly reach in and delete servers, read server files, or change settings behind your back. The engine now verifies that requests really come from the GameNest app and rejects the rest.
+
+### Changed
+- **Signing in is now account-based.** Create your GameNest account on gamenest.cc (username, email, password — you'll get a confirmation mail), then sign in here with it. Discord stays as the one-click alternative. The app no longer creates accounts itself; "Create one on the web" and "Forgot password?" open the website.
+- Names like `Admin` or `Support` are properly reserved now, whatever the capitalisation.
+
 ## [0.6.6] - 2026-07-05
 
 ### Fixed
