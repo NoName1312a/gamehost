@@ -9,6 +9,12 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-07-29
+
+### Security
+- **Shared accounts can no longer touch the whole machine.** If you turn on remote access and hand an admin or operator account to a friend, they can run your game servers — but they can no longer wipe the install, switch remote access on or off, point off-site backups anywhere they like, or change which GameNest account this PC belongs to. Those stay with the owner.
+- **The app window is locked down.** GameNest now restricts what its own interface is allowed to load and where it may send data — to your local engine and your GameNest account, and nowhere else. It's a seatbelt: if a third-party package the app depends on were ever compromised, it can't quietly phone home.
+
 ## [0.6.7] - 2026-07-28
 
 ### Security
