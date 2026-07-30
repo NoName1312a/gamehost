@@ -10,6 +10,7 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use tauri::{Emitter, Manager, RunEvent};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
@@ -59,16 +60,62 @@ fn resolve_frpc() -> Option<PathBuf> {
     candidates.into_iter().find(|p| p.is_file())
 }
 
+/// How long the loopback listener waits for the OAuth redirect before giving
+/// up. Matches the frontend's own 120s sign-in timeout. Without a bound the
+/// thread blocked in `accept()` forever whenever someone closed the browser tab
+/// instead of finishing sign-in, holding port 8788 for the rest of the session
+/// — so the *next* sign-in failed with "port is busy" and the only cure was
+/// restarting GameNest.
+const OAUTH_LOOPBACK_TIMEOUT: Duration = Duration::from_secs(125);
+
 /// Start a one-shot loopback server on a fixed port to capture the OAuth
 /// redirect's `code` query param, then emit it to the frontend as `oauth-code`.
 /// Fixed port 8788 so the redirect URL can be allow-listed in Supabase + Discord.
+///
+/// Not verified here: the `state` parameter. A drive-by page can navigate the
+/// browser to this port with a `code` of its own, and this handler will forward
+/// it. PKCE stops that becoming a takeover — the code verifier never leaves the
+/// app, so an attacker-issued code cannot be exchanged — which leaves a
+/// disrupted sign-in rather than a stolen account. Closing that last gap means
+/// threading a nonce through `redirectTo`, and a mistake there breaks Discord
+/// sign-in for everyone, so it wants a live round-trip to verify first. The
+/// timeout above at least shrinks the window from "forever" to the sign-in
+/// attempt itself.
 #[tauri::command]
 fn start_oauth_loopback(app: tauri::AppHandle) -> Result<u16, String> {
-    let listener = TcpListener::bind("127.0.0.1:8788")
-        .map_err(|_| "Sign-in port 8788 is busy (another GameNest instance?).".to_string())?;
+    let listener = TcpListener::bind("127.0.0.1:8788").map_err(|_| {
+        "Sign-in port 8788 is busy — another GameNest instance, or remote access, may be using it."
+            .to_string()
+    })?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     std::thread::spawn(move || {
-        if let Ok((mut stream, _)) = listener.accept() {
+        // accept() itself has no timeout, so bound the wait by making the
+        // listener non-blocking and polling until the deadline passes.
+        let deadline = Instant::now() + OAUTH_LOOPBACK_TIMEOUT;
+        if listener.set_nonblocking(true).is_err() {
+            return;
+        }
+        let accepted = loop {
+            match listener.accept() {
+                Ok(conn) => break Some(conn),
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    if Instant::now() >= deadline {
+                        break None;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                Err(_) => break None,
+            }
+        };
+        // Dropping the listener here frees the port for the next attempt.
+        drop(listener);
+
+        if let Some((mut stream, _)) = accepted {
+            // Back to blocking for the read/write, with their own bounds so a
+            // half-open connection cannot pin the thread either.
+            let _ = stream.set_nonblocking(false);
+            let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
+            let _ = stream.set_write_timeout(Some(Duration::from_secs(10)));
             let mut buf = [0u8; 4096];
             let n = stream.read(&mut buf).unwrap_or(0);
             let req = String::from_utf8_lossy(&buf[..n]);

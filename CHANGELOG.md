@@ -9,6 +9,17 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-07-30
+
+### Fixed
+- **Changing a server's port broke the "friends can join" address without saying so.** The tunnel kept pointing at the old port, so the address GameNest showed still looked fine but nobody could connect. Editing a port now updates the tunnel properly — and adding or removing a port gets a fresh address instead of a stale one.
+- **"New server" did nothing if the game list failed to load.** Clicking it now explains what went wrong, says your existing servers are unaffected, and offers to retry.
+- **Turning on remote access could break signing in with Discord.** Both were using the same port. Remote access now suggests a different one; if you already picked that port yourself, it stays as you set it.
+- **An abandoned sign-in blocked the next one.** Closing the browser tab midway used to hold the sign-in port until you restarted GameNest. It now frees itself.
+
+### Changed
+- The "GameNest isn't responding" screen now explains what to do — it used to print developer commands that only make sense if you built the app from source.
+
 ## [0.6.8] - 2026-07-29
 
 ### Security

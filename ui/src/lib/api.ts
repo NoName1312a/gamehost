@@ -4,10 +4,20 @@
 export const ENGINE_BASE = "http://127.0.0.1:8723";
 export const ENGINE_WS = "ws://127.0.0.1:8723";
 
+/** Where the engine read its game templates, how many it found, and why it
+ *  failed if it did. Without `error`, a broken load is indistinguishable from
+ *  an empty catalogue — the shape the 0.6.6 empty-library bug hid behind. */
+export interface TemplatesState {
+  dir: string;
+  count: number;
+  error?: string;
+}
+
 export interface Health {
   status: string;
   service: string;
   version: string;
+  templates?: TemplatesState;
 }
 
 export interface Runtime {

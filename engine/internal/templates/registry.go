@@ -59,9 +59,23 @@ type Template struct {
 // Registry is an in-memory, concurrency-safe collection of templates loaded
 // from a directory.
 type Registry struct {
-	dir   string
-	mu    sync.RWMutex
-	items map[string]Template
+	dir     string
+	mu      sync.RWMutex
+	items   map[string]Template
+	loadErr error
+}
+
+// LoadState describes the last Load(): where it read from, how many templates
+// came back, and why it failed if it did.
+//
+// A failed load used to be a log line and nothing else, so the app presented it
+// as "no games available" — indistinguishable from an empty catalogue. That is
+// exactly how the 0.6.6 empty-library bug hid: the engine was looking in the
+// wrong directory and said so only in a log nobody reads.
+type LoadState struct {
+	Dir   string `json:"dir"`
+	Count int    `json:"count"`
+	Error string `json:"error,omitempty"`
 }
 
 // NewRegistry creates a registry backed by the given directory.
@@ -69,9 +83,31 @@ func NewRegistry(dir string) *Registry {
 	return &Registry{dir: dir, items: map[string]Template{}}
 }
 
+// LoadState reports the outcome of the most recent Load.
+func (r *Registry) LoadState() LoadState {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	st := LoadState{Dir: r.dir, Count: len(r.items)}
+	if r.loadErr != nil {
+		st.Error = r.loadErr.Error()
+	}
+	return st
+}
+
 // Load (re)reads every *.yaml/*.yml file in the directory. It is safe to call
-// at runtime to hot-reload templates.
+// at runtime to hot-reload templates. The outcome is retained for LoadState so
+// a failure can be surfaced to the user instead of looking like an empty
+// catalogue.
 func (r *Registry) Load() error {
+	err := r.load()
+	r.mu.Lock()
+	r.loadErr = err
+	r.mu.Unlock()
+	return err
+}
+
+func (r *Registry) load() error {
 	entries, err := os.ReadDir(r.dir)
 	if err != nil {
 		return fmt.Errorf("read templates dir %q: %w", r.dir, err)

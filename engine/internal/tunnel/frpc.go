@@ -71,9 +71,11 @@ func splitFrps(addr string) (host string, port int) {
 	return h, n
 }
 
-// writeConfig renders a frpc.toml for frp v0.69.x with one [[proxies]] block per
-// proxy. All proxies share the frps coordinates; each carries its own secret.
-func writeConfig(path, frpsAddr, frpsToken string, proxies []localProxy) error {
+// renderConfig produces a frpc.toml for frp v0.69.x with one [[proxies]] block
+// per proxy. All proxies share the frps coordinates; each carries its own
+// secret. Kept separate from writing so the Agent can compare what it is about
+// to render against what frpc is already running (see Agent.rewrite).
+func renderConfig(frpsAddr, frpsToken string, proxies []localProxy) string {
 	host, port := splitFrps(frpsAddr)
 	var b strings.Builder
 	fmt.Fprintf(&b, "serverAddr = %q\n", host)
@@ -89,10 +91,15 @@ func writeConfig(path, frpsAddr, frpsToken string, proxies []localProxy) error {
 		fmt.Fprintf(&b, "remotePort = %d\n", p.RemotePort)
 		fmt.Fprintf(&b, "metadatas.gnsecret = %q\n", p.Secret)
 	}
+	return b.String()
+}
+
+// writeConfig renders and persists frpc.toml.
+func writeConfig(path, frpsAddr, frpsToken string, proxies []localProxy) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(b.String()), 0o600)
+	return os.WriteFile(path, []byte(renderConfig(frpsAddr, frpsToken, proxies)), 0o600)
 }
 
 // sidecar supervises a single frpc child process (restart-on-change for MVP).

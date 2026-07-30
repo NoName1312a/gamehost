@@ -178,10 +178,14 @@ func NewRouter(d Deps) http.Handler {
 }
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
+	// templates carries the directory, the count and any load error. Without it
+	// a failed template load is indistinguishable from an empty catalogue —
+	// which is how the 0.6.6 empty-library bug stayed invisible for a release.
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":  "ok",
-		"service": "gamehost-engine",
-		"version": Version,
+		"status":    "ok",
+		"service":   "gamehost-engine",
+		"version":   Version,
+		"templates": a.reg.LoadState(),
 	})
 }
 

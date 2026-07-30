@@ -45,6 +45,10 @@ type Agent struct {
 
 	mu      sync.Mutex
 	current map[string]Allocation // slug -> active allocation
+	// rendered is the frpc.toml frpc is currently running. Comparing against it
+	// is what decides whether to restart, so a change the allocation set cannot
+	// see — an edited local port, say — still reaches frpc.
+	rendered string
 }
 
 // New returns an Agent that talks to the control-plane at baseURL and stores its
@@ -64,10 +68,17 @@ func newAgent(c *Client, sup supervisor, dataDir string) *Agent {
 }
 
 // Reconcile drives the live tunnel set toward want: it releases slugs no longer
-// wanted, allocates newly wanted ones, and—only if the set changed—rewrites
-// frpc.toml from all current allocations and restarts frpc. It is best-effort:
-// a single server's allocate/release failure is logged, not returned, so one
-// bad server can't take down the others. Returns the current allocations.
+// wanted, re-allocates ones whose requested ports changed, allocates newly
+// wanted ones, and rewrites frpc.toml whenever the rendered config differs from
+// what frpc is running. It is best-effort: a single server's allocate/release
+// failure is logged, not returned, so one bad server can't take down the others.
+// Returns the current allocations.
+//
+// Membership alone used to gate the rewrite, which meant editing a tunneled
+// server's port left frpc pointed at the old local port: the slug was still
+// present, so nothing was considered changed and the public address quietly
+// stopped working. Comparing rendered configs catches that and still avoids
+// restarting frpc when nothing actually moved.
 func (a *Agent) Reconcile(ctx context.Context, want []Desired) (map[string]Allocation, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -76,8 +87,6 @@ func (a *Agent) Reconcile(ctx context.Context, want []Desired) (map[string]Alloc
 	for _, d := range want {
 		wantSet[d.Slug] = d
 	}
-
-	changed := false
 
 	// Release slugs no longer wanted.
 	for slug := range a.current {
@@ -88,10 +97,25 @@ func (a *Agent) Reconcile(ctx context.Context, want []Desired) (map[string]Alloc
 			slog.Warn("tunnel: release failed", "slug", slug, "err", err)
 		}
 		delete(a.current, slug)
-		changed = true
 	}
 
-	// Allocate newly wanted slugs (MVP: existing slugs are left as-is).
+	// Drop allocations that no longer describe what the server asks for — a
+	// role or protocol was added, removed or changed. The public ports we hold
+	// are the wrong shape, so the allocation has to be redone rather than
+	// re-rendered; the loop below then treats the slug as new.
+	for slug, d := range wantSet {
+		alloc, ok := a.current[slug]
+		if !ok || allocSatisfies(alloc, d) {
+			continue
+		}
+		slog.Info("tunnel: requested ports changed, re-allocating", "slug", slug)
+		if err := a.client.Release(ctx, slug); err != nil {
+			slog.Warn("tunnel: release before re-allocate failed", "slug", slug, "err", err)
+		}
+		delete(a.current, slug)
+	}
+
+	// Allocate slugs we do not hold an allocation for.
 	for slug, d := range wantSet {
 		if _, ok := a.current[slug]; ok {
 			continue
@@ -102,16 +126,34 @@ func (a *Agent) Reconcile(ctx context.Context, want []Desired) (map[string]Alloc
 			continue
 		}
 		a.current[slug] = alloc
-		changed = true
 	}
 
-	if changed {
-		if err := a.rewrite(wantSet); err != nil {
-			slog.Warn("tunnel: frpc reconfigure failed", "err", err)
-			return a.snapshot(), err
-		}
+	if err := a.rewrite(wantSet); err != nil {
+		slog.Warn("tunnel: frpc reconfigure failed", "err", err)
+		return a.snapshot(), err
 	}
 	return a.snapshot(), nil
+}
+
+// allocSatisfies reports whether an existing allocation still covers what the
+// server asks for: the same roles carrying the same protocols. A changed local
+// port is deliberately not a mismatch — that only needs a re-render, not a new
+// public port.
+func allocSatisfies(alloc Allocation, d Desired) bool {
+	if len(alloc.Proxies) != len(d.Ports) {
+		return false
+	}
+	want := make(map[string]string, len(d.Ports))
+	for _, p := range d.Ports {
+		want[p.Role] = p.Proto
+	}
+	for _, p := range alloc.Proxies {
+		proto, ok := want[p.Role]
+		if !ok || proto != p.Proto {
+			return false
+		}
+	}
+	return true
 }
 
 // rewrite renders frpc.toml from all current allocations and (re)starts frpc, or
@@ -141,13 +183,26 @@ func (a *Agent) rewrite(wantSet map[string]Desired) error {
 	}
 
 	if len(proxies) == 0 {
-		a.sup.stop()
+		if a.rendered != "" {
+			a.sup.stop()
+			a.rendered = ""
+		}
+		return nil
+	}
+
+	// Restart frpc only when the config it is running would actually differ.
+	cfg := renderConfig(frpsAddr, frpsToken, proxies)
+	if cfg == a.rendered && a.sup.isRunning() {
 		return nil
 	}
 	if err := writeConfig(a.cfgPath, frpsAddr, frpsToken, proxies); err != nil {
 		return err
 	}
-	return a.sup.restart(a.cfgPath)
+	if err := a.sup.restart(a.cfgPath); err != nil {
+		return err
+	}
+	a.rendered = cfg
+	return nil
 }
 
 func (a *Agent) snapshot() map[string]Allocation {

@@ -354,6 +354,26 @@ function AppInner() {
           onClose={() => setShowPicker(false)}
         />
       )}
+      {/* "New server" used to render nothing at all when the game library
+          failed to load — a dead button with no explanation. Say what went
+          wrong instead, using the engine's own report where we have it. */}
+      {showPicker && templates.status !== "ok" && (
+        <GameLibraryUnavailable
+          detail={
+            templates.status === "error"
+              ? templates.error
+              : health.status === "ok"
+                ? health.data.templates?.error
+                : undefined
+          }
+          dir={health.status === "ok" ? health.data.templates?.dir : undefined}
+          loading={templates.status === "loading"}
+          onRetry={() => {
+            retry();
+          }}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
       {configureGroup && (
         <ConfigureServerModal
           group={configureGroup}
@@ -431,6 +451,60 @@ function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
   );
 }
 
+export function GameLibraryUnavailable({
+  detail,
+  dir,
+  loading,
+  onRetry,
+  onClose,
+}: {
+  detail?: string;
+  dir?: string;
+  loading: boolean;
+  onRetry: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-950/70 p-6" onClick={onClose}>
+      <div className="panel max-w-md p-6 text-center" onClick={(e) => e.stopPropagation()}>
+        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-lg bg-amber-500/10 text-2xl">
+          {loading ? "⏳" : "⚠️"}
+        </div>
+        <h1 className="font-display text-lg font-semibold text-zinc-100">
+          {loading ? "Loading the game library…" : "The game library didn't load"}
+        </h1>
+        {!loading && (
+          <>
+            <p className="mt-2 text-sm text-zinc-400">
+              GameNest couldn't read its list of games, so there's nothing to pick from. This is a
+              problem with the install, not with your servers — the ones you already have keep
+              running.
+            </p>
+            <p className="mt-3 text-sm text-zinc-400">
+              Restarting GameNest usually fixes it. If it keeps happening, reinstalling restores the
+              bundled games.
+            </p>
+            {dir && (
+              <p className="mt-3 break-all text-xs text-zinc-600">
+                Looked in <code className="font-mono">{dir}</code>
+              </p>
+            )}
+            {detail && <p className="mt-1 break-words text-xs text-zinc-600">{detail}</p>}
+          </>
+        )}
+        <div className="mt-5 flex justify-center gap-2">
+          <button onClick={onRetry} className="btn-primary px-4 py-2 text-sm">
+            Try again
+          </button>
+          <button onClick={onClose} className="btn px-4 py-2 text-sm">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EngineOffline({ error, onRetry }: { error: string; onRetry: () => void }) {
   return (
     <div className="grid min-h-screen place-items-center p-6">
@@ -438,16 +512,25 @@ function EngineOffline({ error, onRetry }: { error: string; onRetry: () => void 
         <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-lg bg-rose-500/10 text-2xl">
           ⚠️
         </div>
-        <h1 className="font-display text-lg font-semibold text-zinc-100">Engine not running</h1>
+        <h1 className="font-display text-lg font-semibold text-zinc-100">
+          GameNest isn&apos;t responding
+        </h1>
+        {/* This screen used to print `cd engine && go run ./cmd/engine`, which
+            is useful to exactly one person and baffling to everyone who
+            installed the app rather than the source. */}
         <p className="mt-2 text-sm text-zinc-400">
-          The control panel can't reach the GameNest engine at{" "}
-          <code className="font-mono rounded bg-zinc-800 px-1 py-0.5 text-zinc-300">{api.base}</code>.
+          The background service that runs your game servers has stopped. Your servers and worlds
+          are untouched — they just can&apos;t be managed until it&apos;s back.
         </p>
-        <pre className="mt-4 overflow-x-auto rounded-md bg-zinc-950/70 p-3 text-left text-xs text-zinc-300 ring-1 ring-zinc-800">
-{`cd engine
-go run ./cmd/engine`}
-        </pre>
-        <p className="mt-2 text-xs text-zinc-600">{error}</p>
+        <p className="mt-3 text-sm text-zinc-400">
+          Closing GameNest completely and starting it again almost always fixes this. If your
+          antivirus asks about GameNest, allow it.
+        </p>
+        <p className="mt-3 text-xs text-zinc-600">
+          Technical detail: no reply from{" "}
+          <code className="font-mono rounded bg-zinc-800 px-1 py-0.5 text-zinc-400">{api.base}</code>
+          {error ? ` — ${error}` : ""}
+        </p>
         <button
           onClick={onRetry}
           className="mt-4 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
