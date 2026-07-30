@@ -22,7 +22,17 @@ import (
 )
 
 // DefaultPort is the suggested remote-access HTTPS port.
-const DefaultPort = 8788
+//
+// Deliberately not 8788: the desktop shell binds that port for the OAuth
+// sign-in loopback, and the redirect URL is allow-listed with Supabase and
+// Discord, so it is the one port that cannot move. Sharing it meant enabling
+// remote access quietly broke Discord sign-in — and the error ("port is busy")
+// pointed at neither feature.
+//
+// Only the *suggestion* changes. An install that already persisted 8788 keeps
+// it, so this cannot move a listener out from under someone's saved bookmark;
+// such a setup still collides, and the sign-in error now says so.
+const DefaultPort = 8790
 
 // State is the persisted remote-access configuration plus the live bound addr.
 type State struct {
