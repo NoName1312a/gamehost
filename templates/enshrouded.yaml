@@ -14,15 +14,16 @@ dataPath: /opt/enshrouded
 commandMethod: ""
 minMemoryMB: 6144
 recMemoryMB: 8192
+# Enshrouded listens on one UDP port, not two. 15636 was a separate game port in
+# an older build; the server dropped it, the image marks SERVER_PORT deprecated
+# in favour of SERVER_QUERYPORT alone, and its config template writes only
+# "queryPort": 15637. Publishing 15636 forwarded a port nothing listens on and
+# spent a relay proxy on it, which counts against the per-device tunnel cap.
 ports:
   - name: game
     container: 15637
     protocol: udp
     default: 15637
-  - name: query
-    container: 15636
-    protocol: udp
-    default: 15636
 env:
   PUID: "4711"
   PGID: "4711"
