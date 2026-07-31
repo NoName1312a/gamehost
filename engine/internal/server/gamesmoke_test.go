@@ -56,6 +56,26 @@ var easyGames = []gameCase{
 	},
 }
 
+// mediumGamesEnv gates the SteamCMD tier separately from the easy one. These
+// download the game itself on first boot — tens of GB for the Source titles —
+// so a run costs hours and real disk, and nobody should trip it by accident
+// while trying to check the light games.
+const mediumGamesEnv = "GAMEHOST_GAME_SMOKE_MEDIUM"
+
+// mediumGames need no third-party account either, but fetch the game through
+// SteamCMD when the container first starts. The boot budgets are download
+// budgets, not startup budgets — the image pull is the small part.
+var mediumGames = []gameCase{
+	{template: "corekeeper", boot: 25 * time.Minute},
+	{template: "unturned", boot: 25 * time.Minute},
+	{template: "enshrouded", boot: 30 * time.Minute},
+	{template: "palworld", boot: 30 * time.Minute},
+	{template: "vrising", boot: 30 * time.Minute},
+	{template: "satisfactory", boot: 40 * time.Minute},
+	{template: "mordhau", boot: 40 * time.Minute},
+	{template: "tf2", boot: 45 * time.Minute},
+}
+
 // TestEasyGamesBoot creates each game through the real Manager and the real
 // Docker runtime — the same path the app takes — then proves the server is
 // actually serving: every port the template publishes has a listening socket,
@@ -64,6 +84,19 @@ func TestEasyGamesBoot(t *testing.T) {
 	if os.Getenv(gameSmokeEnv) == "" {
 		t.Skipf("boots real containers; set %s=1 to run", gameSmokeEnv)
 	}
+	bootGames(t, easyGames)
+}
+
+// TestMediumGamesBoot is the same check for the SteamCMD tier.
+func TestMediumGamesBoot(t *testing.T) {
+	if os.Getenv(mediumGamesEnv) == "" {
+		t.Skipf("downloads tens of GB; set %s=1 to run", mediumGamesEnv)
+	}
+	bootGames(t, mediumGames)
+}
+
+func bootGames(t *testing.T, games []gameCase) {
+	t.Helper()
 
 	rt := docker.New()
 	reg := templates.NewRegistry(filepath.Join("..", "..", "..", "templates"))
@@ -71,7 +104,7 @@ func TestEasyGamesBoot(t *testing.T) {
 		t.Fatalf("load bundled templates: %v", err)
 	}
 
-	for _, gc := range easyGames {
+	for _, gc := range games {
 		t.Run(gc.template, func(t *testing.T) {
 			tpl, ok := reg.Get(gc.template)
 			if !ok {

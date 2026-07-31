@@ -54,6 +54,11 @@ type Template struct {
 	Ports         []Port            `yaml:"ports" json:"ports"`
 	Env           map[string]string `yaml:"env" json:"env"`
 	Variables     []Variable        `yaml:"variables" json:"variables"`
+	// Args is the container command, for images that take required settings
+	// only as command-line arguments rather than environment variables. Entries
+	// may reference a variable as ${KEY}; see expandArgs in the server package
+	// for how a blank value is handled.
+	Args []string `yaml:"args,omitempty" json:"args,omitempty"`
 }
 
 // Registry is an in-memory, concurrency-safe collection of templates loaded

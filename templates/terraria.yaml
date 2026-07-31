@@ -4,7 +4,7 @@ game: terraria
 category: Sandbox
 description: >-
   2D dig-fight-build-explore sandbox adventure. TShock dedicated server; a world
-  is generated on first start. Tiny footprint.
+  is generated on first start from the size you pick below. Tiny footprint.
 icon: terraria
 steamAppId: 105600
 image: ryshe/terraria:latest
@@ -19,6 +19,17 @@ ports:
     container: 7777
     protocol: tcp
     default: 7777
+# This image reads only WORLD_FILENAME from the environment; everything else is
+# a command argument. Without -autocreate it refuses to make a world and exits,
+# and with no WORLD_FILENAME at all it stops at an interactive world-selection
+# prompt and never opens its port — so the game could not be started either way.
+args:
+  - "-autocreate"
+  - "${WORLD_SIZE}"
+  - "-players"
+  - "${MAXPLAYERS}"
+  - "-pass"
+  - "${PASSWORD}"
 env: {}
 variables:
   - key: WORLD_FILENAME
@@ -40,6 +51,7 @@ variables:
     required: false
   - key: PASSWORD
     label: Server password
+    description: Leave blank for an open server
     default: ""
     type: string
     required: false
