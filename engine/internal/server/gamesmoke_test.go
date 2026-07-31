@@ -195,7 +195,12 @@ func portList(ports []docker.PortMapping) string {
 // game image ships net-tools, and it checks inside the container rather than
 // dialing from the host because a UDP port cannot be probed by connecting to
 // it — an unbound UDP port accepts a datagram just as silently as a bound one.
+// It reports every missing port rather than the first. Stopping at the first
+// gap hides whether a game opened none of its sockets or all but one, and those
+// mean different things: none points at a server that never really started, one
+// at a port the template should not be declaring.
 func portsAreServing(container string, ports []docker.PortMapping) error {
+	var missing []string
 	for _, p := range ports {
 		proto := p.Protocol
 		if proto == "" {
@@ -208,8 +213,12 @@ func portsAreServing(container string, ports []docker.PortMapping) error {
 			return fmt.Errorf("read %s inside container: %v", files, err)
 		}
 		if !hasListener(string(out), p.Container, proto) {
-			return fmt.Errorf("nothing listening on %d/%s", p.Container, proto)
+			missing = append(missing, fmt.Sprintf("%d/%s", p.Container, proto))
 		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("nothing listening on %d of %d declared ports: %s",
+			len(missing), len(ports), strings.Join(missing, ", "))
 	}
 	return nil
 }
