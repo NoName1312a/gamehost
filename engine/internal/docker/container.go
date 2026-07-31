@@ -42,6 +42,10 @@ type CreateSpec struct {
 	Volume    string // named volume for persistent data
 	DataPath  string // mount point inside the container
 	OpenStdin bool
+	// Args is the container's command, appended after the image. Some game
+	// images take required settings only this way — the Terraria image will not
+	// create a world without `-autocreate` — so env alone cannot start them.
+	Args []string
 }
 
 // State is the live status of a container.
@@ -111,6 +115,8 @@ func RunArgs(spec CreateSpec) []string {
 		args = append(args, "-v", spec.Volume+":"+spec.DataPath)
 	}
 	args = append(args, spec.Image)
+	// Everything after the image is the container's command, not a docker flag.
+	args = append(args, spec.Args...)
 	return args
 }
 

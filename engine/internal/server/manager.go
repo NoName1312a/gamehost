@@ -42,7 +42,11 @@ type Server struct {
 	CPUs float64 `json:"cpus,omitempty"`
 	// Mods are Modrinth project slugs auto-installed by the image on start
 	// (Minecraft). Pro-only; applied via the MODRINTH_PROJECTS env var.
-	Mods          []string `json:"mods,omitempty"`
+	Mods []string `json:"mods,omitempty"`
+	// Args is the template's container command, stored unexpanded so a later
+	// settings change is picked up: the ${KEY} placeholders are resolved
+	// against Env each time the container is built, not frozen at create time.
+	Args          []string `json:"args,omitempty"`
 	DataPath      string   `json:"dataPath"`
 	CommandMethod string   `json:"commandMethod"`
 	CreatedAt     string   `json:"createdAt"`
@@ -471,6 +475,15 @@ func (m *Manager) Create(req CreateRequest) (*Server, error) {
 	for k, v := range t.Env {
 		env[k] = v
 	}
+	// Variable defaults, before the caller's values. They were previously never
+	// applied here — only whatever the caller happened to send — so a field left
+	// blank ended up unset rather than defaulted. Harmless while the image has
+	// its own defaults, fatal once a required command argument is built from one.
+	for _, v := range t.Variables {
+		if v.Default != "" {
+			env[v.Key] = v.Default
+		}
+	}
 	for k, v := range req.Variables {
 		if strings.TrimSpace(v) != "" {
 			env[k] = v
@@ -515,6 +528,7 @@ func (m *Manager) Create(req CreateRequest) (*Server, error) {
 		Ports:         ports,
 		MemoryMB:      mem,
 		CPUs:          cpus,
+		Args:          t.Args,
 		DataPath:      dataPath,
 		CommandMethod: t.CommandMethod,
 		CreatedAt:     time.Now().UTC().Format(time.RFC3339),
@@ -602,6 +616,15 @@ func (m *Manager) Update(ctx context.Context, id string, req UpdateRequest) (*Se
 	env := map[string]string{}
 	for k, v := range t.Env {
 		env[k] = v
+	}
+	// Variable defaults, before the caller's values. They were previously never
+	// applied here — only whatever the caller happened to send — so a field left
+	// blank ended up unset rather than defaulted. Harmless while the image has
+	// its own defaults, fatal once a required command argument is built from one.
+	for _, v := range t.Variables {
+		if v.Default != "" {
+			env[v.Key] = v.Default
+		}
 	}
 	for k, v := range req.Variables {
 		if strings.TrimSpace(v) != "" {
@@ -694,7 +717,41 @@ func (m *Manager) specFor(s *Server) docker.CreateSpec {
 		Volume:    s.VolumeName(),
 		DataPath:  s.DataPath,
 		OpenStdin: true,
+		Args:      expandArgs(s.Args, env),
 	}
+}
+
+// argPlaceholder matches a ${KEY} reference inside a template's command args.
+var argPlaceholder = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+
+// expandArgs resolves ${KEY} references in a template's container command
+// against a server's settings.
+//
+// An entry whose placeholder resolves to nothing is dropped, and so is the
+// flag in front of it. Optional settings are the reason: left blank, a bare
+// `-pass` with no value shifts every following argument by one, so the game
+// either rejects the command line or reads the next flag as the password.
+// Literal entries are never dropped — only ones that referenced a variable.
+func expandArgs(args []string, env map[string]string) []string {
+	var out []string
+	for _, a := range args {
+		if !argPlaceholder.MatchString(a) {
+			out = append(out, a)
+			continue
+		}
+		expanded := argPlaceholder.ReplaceAllStringFunc(a, func(m string) string {
+			return env[argPlaceholder.FindStringSubmatch(m)[1]]
+		})
+		if strings.TrimSpace(expanded) == "" {
+			// Take the flag this value belonged to with it.
+			if n := len(out); n > 0 && strings.HasPrefix(out[n-1], "-") {
+				out = out[:n-1]
+			}
+			continue
+		}
+		out = append(out, expanded)
+	}
+	return out
 }
 
 // modSlugRe matches a Modrinth project slug/id (no shell-special chars, no comma

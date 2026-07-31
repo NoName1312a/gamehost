@@ -9,6 +9,11 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+### Fixed
+- **Terraria servers could not be started at all.** The server needs to be told to create a world, and GameNest had no way to tell it — so a new Terraria server either restart-looped or sat waiting for input that never came, and never opened its port. It now creates the world on first start and loads it again on every start after.
+- **Terraria's World size, Max players and Server password did nothing.** They were being passed in a way the Terraria server never reads. All three now take effect, and leaving the password blank correctly means "no password" instead of breaking the server.
+- **Settings left at their default were sent as empty.** Creating or editing a server through anything other than the app's own form could leave a setting unset instead of at the value shown as its default.
+
 ## [0.6.11] - 2026-07-31
 
 ### Fixed
