@@ -287,14 +287,19 @@ func (m *Manager) save() error {
 	if err != nil {
 		return err
 	}
+	// 0600, not 0644: this file holds per-server game secrets (RCON passwords
+	// and the like) in cleartext. On Windows the inherited ACL is what actually
+	// governs access, so the mode bits change little there — but the same
+	// manager is what the planned Linux edition will run, and there a
+	// world-readable secrets file is exactly what it looks like.
 	tmp := m.path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
 		return err
 	}
 	// Best-effort: keep the last good file as .bak (skipped on the first save,
 	// when no main file exists yet).
 	if prev, rerr := os.ReadFile(m.path); rerr == nil {
-		_ = os.WriteFile(m.path+".bak", prev, 0o644)
+		_ = os.WriteFile(m.path+".bak", prev, 0o600)
 	}
 	return os.Rename(tmp, m.path)
 }

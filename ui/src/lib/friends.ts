@@ -57,7 +57,11 @@ export async function listRequests(): Promise<RequestView[]> {
 
 export async function sendRequest(username: string): Promise<void> {
   const me = await myId()
-  const { data: target } = await supabase.from('profiles').select('id').ilike('username', username).maybeSingle()
+  // .eq, not .ilike: username is a citext column, so equality is already
+  // case-insensitive — and ilike treats the input as a pattern. Usernames may
+  // contain underscores, so searching for "leo_player" with ilike also matches
+  // "leoXplayer", and the request goes to a stranger.
+  const { data: target } = await supabase.from('profiles').select('id').eq('username', username).maybeSingle()
   if (!target) throw new Error('No user with that username.')
   if (target.id === me) throw new Error("That's you!")
   const { data: existing } = await supabase.from('friendships').select('id, status')

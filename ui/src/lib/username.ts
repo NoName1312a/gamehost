@@ -21,7 +21,10 @@ export async function isUsernameAvailable(name: string): Promise<boolean> {
   const { data } = await supabase
     .from('profiles')
     .select('id')
-    .ilike('username', name)
+    // .eq on a citext column: case-insensitive equality without treating the
+    // input as a LIKE pattern. With ilike, a name containing "_" matched other
+    // names and reported itself unavailable.
+    .eq('username', name)
     .maybeSingle()
   return !data
 }

@@ -9,6 +9,16 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.6.10] - 2026-07-31
+
+### Fixed
+- **Friend requests could reach the wrong person.** Searching for a username containing an underscore also matched similar names — looking for `leo_player` could find `leoXplayer`. Usernames are now matched exactly.
+- Checking whether a username is free had the same flaw and could report a free name as taken.
+
+### Security
+- The file listing your servers is no longer world-readable. It holds server passwords, so it is now readable only by your account.
+- Released builds no longer trust the development server's address. Nothing could reach it in practice, but a shipped app has no business trusting it.
+
 ## [0.6.9] - 2026-07-30
 
 ### Fixed

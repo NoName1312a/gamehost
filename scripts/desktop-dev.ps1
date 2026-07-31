@@ -10,6 +10,10 @@ $root = Split-Path -Parent $PSScriptRoot
 
 $env:Path += ";C:\Program Files\Go\bin;$env:USERPROFILE\.cargo\bin"
 
+# Lets the engine trust the Vite dev server's origin. Released builds do not,
+# so this has to be opt-in — see allowedOrigins() in engine/internal/config.
+$env:GAMEHOST_DEV = "1"
+
 & "$PSScriptRoot\build-desktop.ps1"
 
 $tauri = Join-Path $root "ui\node_modules\.bin\tauri.cmd"
