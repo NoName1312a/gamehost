@@ -26,17 +26,33 @@ func Load() Config {
 		Addr:         envOr("GAMEHOST_ADDR", "127.0.0.1:8723"),
 		TemplatesDir: envOr("GAMEHOST_TEMPLATES", defaultTemplatesDir()),
 		DataDir:      envOr("GAMEHOST_DATA", defaultDataDir()),
-		AllowOrigins: []string{
-			// Vite dev server (browser dev + `tauri dev`).
+		AllowOrigins: allowedOrigins(),
+	}
+}
+
+// allowedOrigins is the CORS allow-list for the browser UI.
+//
+// The Vite dev server used to be on it unconditionally, so every shipped build
+// also trusted http://localhost:5173 — a port anything on the machine can bind.
+// The anti-DNS-rebinding host guard and the CSRF header still stand in the way,
+// so this was never a hole on its own, but a released binary has no business
+// trusting a dev server. It is now opt-in via GAMEHOST_DEV=1, which
+// scripts/desktop-dev.ps1 sets.
+func allowedOrigins() []string {
+	origins := []string{
+		// Tauri desktop webview custom protocol. Windows serves the bundled
+		// app from http(s)://tauri.localhost; macOS/Linux use tauri://localhost.
+		"http://tauri.localhost",
+		"https://tauri.localhost",
+		"tauri://localhost",
+	}
+	if os.Getenv("GAMEHOST_DEV") == "1" {
+		origins = append(origins,
 			"http://localhost:5173",
 			"http://127.0.0.1:5173",
-			// Tauri desktop webview custom protocol. Windows serves the bundled
-			// app from http(s)://tauri.localhost; macOS/Linux use tauri://localhost.
-			"http://tauri.localhost",
-			"https://tauri.localhost",
-			"tauri://localhost",
-		},
+		)
 	}
+	return origins
 }
 
 func envOr(key, def string) string {

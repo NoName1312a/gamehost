@@ -12,7 +12,7 @@ beforeEach(() => {
 describe('sendRequest', () => {
   it('rejects sending to yourself', async () => {
     sb.from.mockImplementation((t: string) => {
-      if (t === 'profiles') return { select: () => ({ ilike: () => ({ maybeSingle: async () => ({ data: { id: 'me' } }) }) }) }
+      if (t === 'profiles') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'me' } }) }) }) }
       return {}
     })
     await expect(sendRequest('Me')).rejects.toThrow(/you/i)
@@ -20,7 +20,7 @@ describe('sendRequest', () => {
 
   it('rejects an unknown username', async () => {
     sb.from.mockImplementation((t: string) => {
-      if (t === 'profiles') return { select: () => ({ ilike: () => ({ maybeSingle: async () => ({ data: null }) }) }) }
+      if (t === 'profiles') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) }
       return {}
     })
     await expect(sendRequest('ghost')).rejects.toThrow(/no user/i)
@@ -29,7 +29,7 @@ describe('sendRequest', () => {
   it('inserts a pending request for a valid new friend', async () => {
     const insert = vi.fn(async () => ({ error: null }))
     sb.from.mockImplementation((t: string) => {
-      if (t === 'profiles') return { select: () => ({ ilike: () => ({ maybeSingle: async () => ({ data: { id: 'them' } }) }) }) }
+      if (t === 'profiles') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'them' } }) }) }) }
       if (t === 'friendships') return {
         select: () => ({ or: () => ({ maybeSingle: async () => ({ data: null }) }) }),
         insert,
