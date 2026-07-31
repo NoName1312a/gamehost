@@ -3,14 +3,15 @@ name: Veloren
 game: veloren
 category: Survival
 description: >-
-  Open-source voxel multiplayer action-RPG. Dedicated server; world generation on
-  first boot uses some CPU/RAM. Server settings live in settings.ron — edit it in
-  the file manager.
+  Open-source voxel multiplayer action-RPG. Official dedicated server, pinned to
+  the current stable release so it matches the client players install. World
+  generation on first boot uses some CPU/RAM. Server settings live in
+  settings.ron under the data folder — edit it in the file manager.
 icon: veloren
-image: florianpiesche/veloren-server:latest
+image: registry.gitlab.com/veloren/veloren/server-cli:v0.18.0
 runtime: native
 stopCommand: ""
-dataPath: /saves
+dataPath: /opt/userdata
 commandMethod: ""
 minMemoryMB: 2048
 recMemoryMB: 4096
@@ -19,5 +20,9 @@ ports:
     container: 14004
     protocol: tcp
     default: 14004
+  - name: query
+    container: 14006
+    protocol: udp
+    default: 14006
 env: {}
 variables: []
