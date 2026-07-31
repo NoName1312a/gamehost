@@ -7,7 +7,10 @@ description: >-
   page URL plus a free CurseForge API key and GameNest auto-installs it. The key
   is required by CurseForge for automatic downloads.
 icon: minecraft
-image: itzg/minecraft-server:latest
+# Pinned to Java 21, not `latest`. `latest` tracks the newest JDK — it ships
+# Java 25 today — and Forge/Fabric mods for Minecraft 1.20/1.21 declare a hard
+# dependency on Java 21, so the loader aborts before the server ever starts.
+image: itzg/minecraft-server:java21
 runtime: java
 stopCommand: stop
 dataPath: /data

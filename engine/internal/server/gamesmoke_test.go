@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -54,6 +56,13 @@ var easyGames = []gameCase{
 		vars:     map[string]string{"VERSION": "1.21.4", "TYPE": "PAPER", "MEMORY": "1G"},
 		boot:     8 * time.Minute, // downloads the server jar, then generates a world
 	},
+	{
+		// MODRINTH_MODPACK has no default and is required, so this is the one
+		// template that cannot be created without being told what to run.
+		template: "minecraft-modrinth",
+		vars:     map[string]string{"MODRINTH_MODPACK": "cobblemon-fabric", "MEMORY": "2G"},
+		boot:     15 * time.Minute, // fetches and installs the whole modpack first
+	},
 }
 
 // mediumGamesEnv gates the SteamCMD tier separately from the easy one. These
@@ -66,6 +75,9 @@ const mediumGamesEnv = "GAMEHOST_GAME_SMOKE_MEDIUM"
 // SteamCMD when the container first starts. The boot budgets are download
 // budgets, not startup budgets — the image pull is the small part.
 var mediumGames = []gameCase{
+	// Valheim belongs here, not with the light games: it needs no account, but
+	// SteamCMD still fetches the whole server on first start.
+	{template: "valheim", boot: 25 * time.Minute},
 	{template: "corekeeper", boot: 25 * time.Minute},
 	{template: "unturned", boot: 25 * time.Minute},
 	// 45, not 30: the SteamCMD fetch alone took ~29 minutes here, so the old
@@ -132,7 +144,20 @@ func bootGames(t *testing.T, games []gameCase) {
 			ctx, cancel := context.WithTimeout(context.Background(), gc.boot+10*time.Minute)
 			defer cancel()
 
-			srv, err := m.Create(CreateRequest{TemplateID: gc.template, Name: "smoke", Variables: gc.vars})
+			req := CreateRequest{TemplateID: gc.template, Name: "smoke", Variables: gc.vars}
+			// Whatever else is on this machine is not the template's fault. A
+			// paused container still owns its host binding, so Minecraft's
+			// 25565 is routinely taken on a developer box and the run died at
+			// `docker run` with "port is already allocated". Only the host side
+			// moves — the container port is unchanged, which is what the
+			// listening check looks at.
+			if len(tpl.Ports) > 0 && !hostPortFree(tpl.Ports[0].Default) {
+				free := freeHostPort(t)
+				t.Logf("host port %d is in use; publishing on %d instead", tpl.Ports[0].Default, free)
+				req.Port = free
+			}
+
+			srv, err := m.Create(req)
 			if err != nil {
 				t.Fatalf("create: %v", err)
 			}
@@ -178,6 +203,67 @@ func bootGames(t *testing.T, games []gameCase) {
 			t.Logf("%s: serving %s, data under %s", gc.template, portList(srv.Ports), srv.DataPath)
 		})
 	}
+}
+
+// hostPortFree reports whether the port can actually be published.
+//
+// Asking the kernel is not enough. Docker keeps its own allocation table and
+// rejects a publish for a port it has already handed to another container even
+// when nothing is listening — a paused container still owns its binding. And on
+// Docker Desktop the binding lands on IPv6 via wslrelay, so a bind probe on
+// 127.0.0.1 succeeds and reports a port free that `docker run` then refuses.
+func hostPortFree(port int) bool {
+	if dockerPublishedPorts()[port] {
+		return false
+	}
+	l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		return false
+	}
+	l.Close()
+	return true
+}
+
+// dockerPublishedPorts collects the host ports currently published by
+// containers. Entries look like "0.0.0.0:25565->25565/tcp, [::]:25565->25565/tcp".
+func dockerPublishedPorts() map[int]bool {
+	out, err := exec.Command("docker", "ps", "--format", "{{.Ports}}").CombinedOutput()
+	if err != nil {
+		return nil
+	}
+	used := map[int]bool{}
+	for _, m := range hostPortRe.FindAllStringSubmatch(string(out), -1) {
+		lo, err := strconv.Atoi(m[1])
+		if err != nil {
+			continue
+		}
+		hi := lo
+		if m[2] != "" {
+			if h, err := strconv.Atoi(m[2]); err == nil {
+				hi = h
+			}
+		}
+		for p := lo; p <= hi; p++ {
+			used[p] = true
+		}
+	}
+	return used
+}
+
+// hostPortRe pulls the host side out of a "…:<host>-><container>/proto" mapping.
+// Consecutive ports are collapsed into a range — Valheim publishes as
+// "2456-2457->2456-2457/udp" — so a single-port pattern would miss both.
+var hostPortRe = regexp.MustCompile(`:(\d+)(?:-(\d+))?->`)
+
+// freeHostPort asks the kernel for an unused port.
+func freeHostPort(t *testing.T) int {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("find a free port: %v", err)
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port
 }
 
 func portList(ports []docker.PortMapping) string {

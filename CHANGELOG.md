@@ -10,6 +10,7 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 ## [Unreleased]
 
 ### Fixed
+- **Modpack servers would not start at all.** Both the Modrinth and CurseForge templates were running on a Java version that mods for Minecraft 1.20 and 1.21 refuse to load on, so a new modpack server failed during startup and kept restarting. They now run on the Java version modpacks expect.
 - **Enshrouded opened a second port nothing was listening on.** The game uses a single port now, but GameNest still forwarded an old one alongside it — and when sharing through the built-in tunnel, spent one of your server's tunnel slots on it. Joining was unaffected.
 - **Terraria servers could not be started at all.** The server needs to be told to create a world, and GameNest had no way to tell it — so a new Terraria server either restart-looped or sat waiting for input that never came, and never opened its port. It now creates the world on first start and loads it again on every start after.
 - **Terraria's World size, Max players and Server password did nothing.** They were being passed in a way the Terraria server never reads. All three now take effect, and leaving the password blank correctly means "no password" instead of breaking the server.

@@ -7,7 +7,10 @@ description: >-
   GameNest auto-downloads and installs it (Forge/Fabric/Quilt handled for you).
   No account or API key needed.
 icon: minecraft
-image: itzg/minecraft-server:latest
+# Pinned to Java 21, not `latest`. `latest` tracks the newest JDK — it ships
+# Java 25 today — and Fabric/Forge mods for Minecraft 1.20/1.21 declare a hard
+# dependency on Java 21, so the loader aborts before the server ever starts.
+image: itzg/minecraft-server:java21
 runtime: java
 stopCommand: stop
 dataPath: /data
