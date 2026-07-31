@@ -1,0 +1,66 @@
+name: CI
+
+# Tests on every push and pull request, plus a weekly re-check of the game
+# catalogue's container images.
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  schedule:
+    # Mondays 06:00 UTC. The image check is the reason this runs on a timer:
+    # a template's image can stop resolving without anyone touching this repo,
+    # so a push-triggered check alone would never notice.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Engine + UI tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+          cache-dependency-path: engine/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: go vet
+        working-directory: engine
+        run: go vet ./...
+
+      - name: go test
+        working-directory: engine
+        run: go test ./...
+
+      - name: Install UI dependencies
+        run: npm --prefix ui ci
+
+      - name: UI tests
+        run: npm --prefix ui test
+
+  template-images:
+    name: Game template images are pullable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+          cache-dependency-path: engine/go.sum
+
+      # Asks each game's registry whether its exact image:tag can still be
+      # pulled. Nothing validates templates at load time, so without this a
+      # rotted reference stays invisible until a user picks that game and the
+      # container create fails on their PC — which is how Veloren shipped
+      # broken in 0.6.9.
+      - name: Resolve every template image
+        working-directory: engine
+        env:
+          GAMEHOST_REGISTRY_SMOKE: "1"
+        run: go test ./internal/templates/ -run TestBundledImagesArePullable -v

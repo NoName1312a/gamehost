@@ -9,6 +9,9 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+### Fixed
+- **Veloren servers could not be created at all.** GameNest pointed at a community server image that stopped publishing the version it asked for, so picking Veloren failed while every other game worked. It now uses the Veloren project's own dedicated server, pinned to the stable release your game client installs — and its save data and the query port that server browsers use are configured correctly, which they were not before.
+
 ## [0.6.10] - 2026-07-31
 
 ### Fixed
