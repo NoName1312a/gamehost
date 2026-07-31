@@ -68,7 +68,9 @@ const mediumGamesEnv = "GAMEHOST_GAME_SMOKE_MEDIUM"
 var mediumGames = []gameCase{
 	{template: "corekeeper", boot: 25 * time.Minute},
 	{template: "unturned", boot: 25 * time.Minute},
-	{template: "enshrouded", boot: 30 * time.Minute},
+	// 45, not 30: the SteamCMD fetch alone took ~29 minutes here, so the old
+	// budget left the game no time to start once it had finished downloading.
+	{template: "enshrouded", boot: 45 * time.Minute},
 	{template: "palworld", boot: 30 * time.Minute},
 	{template: "vrising", boot: 30 * time.Minute},
 	{template: "satisfactory", boot: 40 * time.Minute},
@@ -116,13 +118,19 @@ func bootGames(t *testing.T, games []gameCase) {
 				t.Fatalf("new manager: %v", err)
 			}
 
-			// Pull first so the boot deadline measures the game starting up,
-			// not the download.
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-			defer cancel()
-			if err := rt.Pull(ctx, tpl.Image, nil); err != nil {
+			// The pull gets its own budget so the boot deadline measures the
+			// game starting up, not the download. Sharing one context between
+			// them meant a slow pull ate into the boot window and then expired
+			// mid-wait, which surfaced as a bogus "container exited" verdict
+			// against a server that was demonstrably alive and saving.
+			pullCtx, cancelPull := context.WithTimeout(context.Background(), 60*time.Minute)
+			defer cancelPull()
+			if err := rt.Pull(pullCtx, tpl.Image, nil); err != nil {
 				t.Fatalf("pull %s: %v", tpl.Image, err)
 			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), gc.boot+10*time.Minute)
+			defer cancel()
 
 			srv, err := m.Create(CreateRequest{TemplateID: gc.template, Name: "smoke", Variables: gc.vars})
 			if err != nil {
@@ -142,9 +150,15 @@ func bootGames(t *testing.T, games []gameCase) {
 			deadline := time.Now().Add(gc.boot)
 			var lastErr error
 			for time.Now().Before(deadline) {
-				if st := rt.Inspect(ctx, name); !st.Running {
-					t.Fatalf("container exited during boot (status %q); logs:\n%s",
-						st.Status, containerLogs(name, 40))
+				// Only a terminal state counts as death. Inspect reports any
+				// failure — a daemon hiccup, an expired context — as
+				// State{Exists:false} with a blank status, which is
+				// indistinguishable from "not running" but is not evidence the
+				// container died. Treating every non-Running answer as a crash
+				// failed a healthy Enshrouded server on a transient hiccup.
+				if st := rt.Inspect(ctx, name); st.Exists && (st.Status == "exited" || st.Status == "dead") {
+					t.Fatalf("container %s during boot; logs:\n%s",
+						st.Status, containerLogs(name, 60))
 				}
 				if lastErr = portsAreServing(name, srv.Ports); lastErr == nil {
 					break
