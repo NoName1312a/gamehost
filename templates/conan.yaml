@@ -10,7 +10,12 @@ steamAppId: 440900
 image: indifferentbroccoli/conan-exiles-enhanced-server-docker:latest
 runtime: wine
 stopCommand: ""
-dataPath: /home/steam/conan-dedicated
+# /home/steam/conan-dedicated does not exist in this image and never did — the
+# volume was mounted at a path the game never touches while SteamCMD installed
+# to /home/steam/server-files, so every world would have been discarded on the
+# next recreate. Nobody can have data at the old path: Conan could not start at
+# all until now, so there is nothing to migrate.
+dataPath: /home/steam/server-files
 commandMethod: ""
 minMemoryMB: 6144
 recMemoryMB: 8192
