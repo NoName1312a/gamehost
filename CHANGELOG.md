@@ -9,6 +9,17 @@ rename `[Unreleased]` to the version you're shipping (e.g. `## [0.4.0] - 2026-06
 
 ## [Unreleased]
 
+## [0.6.13] - 2026-08-01
+
+### Fixed
+- **Soulmask servers ran but nobody could join.** The server was listening on different ports than GameNest opened for it, so it started, looked healthy and even showed up in Soulmask's own server list while every friend's connection went nowhere. It now listens where GameNest sends people.
+- **Soulmask used the same admin password on every server.** It fell back to a publicly documented default, and there was no way to change it. It's a setting now — pick your own.
+- **Insurgency Sandstorm servers ran but nobody could join.** Same problem: the server came up fully but on ports GameNest wasn't opening.
+- **ARK Survival Ascended servers could not be started at all.** GameNest asked ARK for an admin password by a name ARK doesn't recognise, and ARK refuses to start without one, so every ARK server failed immediately. Setting your own admin password is now part of creating the server.
+- **Conan Exiles servers could not be started at all.** The server needs to be told which account to run as and quit straight away without it.
+- **Eco servers could not be started at all.** Eco needed sign-in details it was never given, and its Steam support was missing a file it needed. Eco now starts in offline mode — friends can join right away with no Eco account, though your server won't appear in the public list.
+- **Eco asked for a server token that did nothing.** Creating an Eco server required a token from play.eco that was never passed on. Server settings, including that token, live in Configs/Network.eco — edit it in the file manager.
+
 ## [0.6.12] - 2026-08-01
 
 ### Fixed
