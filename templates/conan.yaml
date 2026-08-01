@@ -27,7 +27,12 @@ ports:
     container: 27015
     protocol: udp
     default: 27015
-env: {}
+# The image's init script exits 1 outright when these are unset — it uses them
+# to usermod its steam user before chowning the server files, and refuses to
+# guess. Without them Conan never started for anyone.
+env:
+  PUID: "1000"
+  PGID: "1000"
 variables:
   - key: SERVER_NAME
     label: Server Name

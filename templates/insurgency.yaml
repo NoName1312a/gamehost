@@ -22,7 +22,13 @@ ports:
     container: 27131
     protocol: udp
     default: 27131
-env: {}
+# The image's entrypoint ends with `-Port=$PORT -QueryPort=$QUERYPORT` and
+# defines neither, so both expanded to nothing and the server was handed empty
+# port arguments. It came up fully — session created, anti-cheat happy, map
+# loaded — on neither of the ports GameNest published, so nobody could reach it.
+env:
+  PORT: "27102"
+  QUERYPORT: "27131"
 variables:
   - key: HOSTNAME
     label: Server Name
