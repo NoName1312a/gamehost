@@ -4,8 +4,9 @@ game: eco
 category: Simulation
 description: >-
   Collaborative eco-civilization sim — build a society without wrecking the
-  ecosystem. Server settings, including the play.eco token that lists your
-  server publicly, live in Configs/Network.eco — edit it in the file manager.
+  ecosystem. Runs in offline mode so friends can join straight away without
+  anyone needing an Eco account; it will not appear in the public server list.
+  Other settings live in Configs/Network.eco — edit it in the file manager.
 icon: eco
 steamAppId: 382310
 image: strangeloopgames/eco-game-server:latest
@@ -30,7 +31,27 @@ ports:
     container: 3002
     protocol: tcp
     default: 3002
-env: {}
+# Eco refuses to start without an authentication method and says so explicitly:
+#   Authentication to Strange Cloud failed. No authentication methods were
+#   available. Provide valid credentials (...) or use '-offline'.
+# It takes them as command arguments, never as environment variables — which is
+# why the old ECO_TOKEN could not have worked whatever it was named. Offline is
+# the right default for hosting on your own PC for friends: the alternative is a
+# server that cannot start at all without an Eco account.
+# This image has no ENTRYPOINT, only CMD, so args replace the command instead of
+# extending it — the whole line has to be repeated, not just the flag. Mirrors
+# the image's own CMD ["./EcoServer", "--nogui"] with WorkingDir /app.
+args:
+  - "./EcoServer"
+  - "--nogui"
+  - "-offline"
+env:
+  # The image ships steamclient.so at /app/steamclient.so but nothing puts /app
+  # on the library search path, so Eco's Steamworks plugin dlopen'd it by bare
+  # name, failed, and took the whole server down with "Steam game server failed
+  # to initialize" — with or without a data volume. One entry turns that into
+  # "Loaded local 'steamclient.so' OK".
+  LD_LIBRARY_PATH: /app
 # ECO_TOKEN used to be here, marked required. The image never reads it — the
 # string appears nowhere in it — so the form demanded a value that did nothing
 # and the server was never listed publicly. Eco takes it from Configs/Network.eco

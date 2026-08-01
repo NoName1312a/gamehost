@@ -96,6 +96,9 @@ var mediumGames = []gameCase{
 	// SteamCMD still fetches the whole server on first start.
 	{template: "valheim", boot: 25 * time.Minute},
 	{template: "corekeeper", boot: 25 * time.Minute},
+	// Bootable at all only since ECO_TOKEN stopped being a required variable:
+	// the form used to refuse a server without a token the image never read.
+	{template: "eco", boot: 25 * time.Minute},
 	{template: "unturned", boot: 25 * time.Minute},
 	// 45, not 30: the SteamCMD fetch alone took ~29 minutes here, so the old
 	// budget left the game no time to start once it had finished downloading.
