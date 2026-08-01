@@ -39,8 +39,13 @@ variables:
     default: ""
     type: string
     required: false
-  - key: ADMIN_PASSWORD
+  # The image reads SERVER_ADMIN_PASSWORD, not ADMIN_PASSWORD, and exits 1 when
+  # it is empty — so under the old name the server aborted before it ever
+  # started. It needs a non-blank default for the same reason; required so the
+  # form makes the user replace it rather than shipping a known one.
+  - key: SERVER_ADMIN_PASSWORD
     label: Admin password
-    default: ""
+    description: Required by ARK — set your own, it grants full server control
+    default: changeme
     type: string
-    required: false
+    required: true
