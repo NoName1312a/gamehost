@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -260,6 +261,19 @@ func bootGames(t *testing.T, games []gameCase) {
 				t.Errorf("dataPath %q: %v", srv.DataPath, err)
 			}
 			t.Logf("%s: serving %s, data under %s", gc.template, portList(srv.Ports), srv.DataPath)
+
+			// Let the server settle before looking for ports it opens beyond the
+			// declared ones. Readiness fires the moment the declared ports are
+			// up, which for a game that binds in sequence is mid-startup:
+			// Minecraft has 25565 listening well before it prepares the level
+			// and only then starts RCON on 25575, so sampling at the instant of
+			// readiness found nothing and made this check look like it had
+			// nothing to say.
+			time.Sleep(20 * time.Second)
+			if extra := undeclaredListeners(name, srv.Ports); len(extra) > 0 {
+				t.Logf("%s: also listening on %s — not published by the template; "+
+					"check whether players need to reach these", gc.template, strings.Join(extra, " "))
+			}
 		})
 	}
 }
@@ -345,20 +359,14 @@ func portList(ports []docker.PortMapping) string {
 // mean different things: none points at a server that never really started, one
 // at a port the template should not be declaring.
 func portsAreServing(container string, ports []docker.PortMapping) error {
+	live, err := listeningPorts(container)
+	if err != nil {
+		return err
+	}
 	var missing []string
 	for _, p := range ports {
-		proto := p.Protocol
-		if proto == "" {
-			proto = "tcp"
-		}
-		files := []string{"/proc/net/" + proto, "/proc/net/" + proto + "6"}
-		out, err := exec.Command("docker", "exec", container,
-			"cat", files[0], files[1]).CombinedOutput()
-		if err != nil && len(out) == 0 {
-			return fmt.Errorf("read %s inside container: %v", files, err)
-		}
-		if !hasListener(string(out), p.Container, proto) {
-			missing = append(missing, fmt.Sprintf("%d/%s", p.Container, proto))
+		if !live[portKey(p.Container, p.Protocol)] {
+			missing = append(missing, portKey(p.Container, p.Protocol))
 		}
 	}
 	if len(missing) > 0 {
@@ -368,28 +376,98 @@ func portsAreServing(container string, ports []docker.PortMapping) error {
 	return nil
 }
 
-// hasListener parses /proc/net/{tcp,udp} for a socket bound to port. The
-// local_address column is HEXIP:HEXPORT; for TCP the state column must be 0A
-// (LISTEN), while a UDP socket is bound as soon as it appears.
-func hasListener(procNet string, port int, proto string) bool {
-	want := strings.ToUpper(strconv.FormatInt(int64(port), 16))
-	if len(want) < 4 {
-		want = strings.Repeat("0", 4-len(want)) + want
+// undeclaredListeners is the check in the other direction: ports the game is
+// serving on that the template never publishes.
+//
+// Comparing only declared-against-reality can never see this. Squad's beacon
+// port is in the image's own configuration and absent from the template, and
+// the run that "passed" it looked exactly like a run that had nothing to say —
+// because the test only ever looked at the three ports it was told about.
+//
+// This is reported rather than failed. A bound port is not automatically one
+// that should be published: RCON is the standing counter-example — several
+// images enable it by default, and exposing a remote-control port to the
+// internet is a decision, not an omission.
+func undeclaredListeners(container string, ports []docker.PortMapping) []string {
+	live, err := listeningPorts(container)
+	if err != nil {
+		return nil
 	}
-	for _, line := range strings.Split(procNet, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 4 {
+	declared := map[string]bool{}
+	for _, p := range ports {
+		declared[portKey(p.Container, p.Protocol)] = true
+	}
+
+	var extra []string
+	for key := range live {
+		if declared[key] {
 			continue
 		}
-		_, hexPort, ok := strings.Cut(fields[1], ":")
-		if !ok || !strings.EqualFold(hexPort, want) {
+		port, _, _ := strings.Cut(key, "/")
+		n, err := strconv.Atoi(port)
+		// Above the ephemeral range a socket is almost certainly an outbound
+		// connection the game made, not a service it offers.
+		if err != nil || n >= 32768 {
 			continue
 		}
-		if proto == "udp" || strings.EqualFold(fields[3], "0A") {
-			return true
-		}
+		extra = append(extra, key)
 	}
-	return false
+	sort.Strings(extra)
+	return extra
+}
+
+func portKey(port int, proto string) string {
+	if proto == "" {
+		proto = "tcp"
+	}
+	return fmt.Sprintf("%d/%s", port, proto)
+}
+
+// listeningPorts returns every externally reachable socket the container holds,
+// keyed "port/proto".
+//
+// Only wildcard binds count. A socket on 127.0.0.1 is unreachable from outside
+// the container however the ports are published, so treating it as served would
+// pass a game nobody can join — Veloren's admin interface sits on loopback 14005
+// exactly like that.
+func listeningPorts(container string) (map[string]bool, error) {
+	// Label each line with its protocol; concatenating the four files would
+	// lose which is which.
+	const script = `for f in tcp tcp6 udp udp6; do sed "s|^|$f |" /proc/net/$f 2>/dev/null; done`
+	out, err := exec.Command("docker", "exec", container, "sh", "-c", script).CombinedOutput()
+	if err != nil && len(out) == 0 {
+		return nil, fmt.Errorf("read /proc/net inside container: %v", err)
+	}
+
+	live := map[string]bool{}
+	for _, line := range strings.Split(string(out), "\n") {
+		f := strings.Fields(line)
+		// proto sl local_address rem_address st ...
+		if len(f) < 5 {
+			continue
+		}
+		proto := strings.TrimSuffix(f[0], "6")
+		if proto != "tcp" && proto != "udp" {
+			continue
+		}
+		hexIP, hexPort, ok := strings.Cut(f[2], ":")
+		if !ok {
+			continue
+		}
+		if strings.Trim(hexIP, "0") != "" {
+			continue // bound to a specific address, not the wildcard
+		}
+		// TCP must be in LISTEN (0A); a UDP socket is bound as soon as it exists.
+		if proto == "tcp" && !strings.EqualFold(f[4], "0A") {
+			continue
+		}
+		n, err := strconv.ParseInt(hexPort, 16, 32)
+		if err != nil {
+			continue
+		}
+		live[portKey(int(n), proto)] = true
+	}
+	return live, nil
 }
 
 // volumeHasData reports whether the game wrote anything under the mount point
