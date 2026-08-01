@@ -36,6 +36,10 @@ type gameCase struct {
 	// boots generate worlds and sometimes download a server jar, so these are
 	// per-game rather than one global timeout.
 	boot time.Duration
+	// memMB overrides the template's recommended memory. Only for games whose
+	// recommendation exceeds what a test machine has — ARK asks for 16 GB, and
+	// a container capped above the host's RAM is killed rather than throttled.
+	memMB int
 }
 
 // easyGames are the templates that need no third-party account and fit
@@ -88,6 +92,33 @@ var mediumGames = []gameCase{
 	{template: "satisfactory", boot: 40 * time.Minute},
 	{template: "mordhau", boot: 40 * time.Minute},
 	{template: "tf2", boot: 45 * time.Minute},
+}
+
+// heavyGamesEnv gates the tier that costs tens of GB per game.
+const heavyGamesEnv = "GAMEHOST_GAME_SMOKE_HEAVY"
+
+// heavyGames need no third-party account either, but download tens of GB each
+// and several want 8 GB of RAM. Ordered smallest-download first so a run that
+// is cut short still produces results. Squad is last because it is ~50 GB on
+// its own.
+var heavyGames = []gameCase{
+	{template: "rust", boot: 45 * time.Minute},
+	{template: "soulmask", boot: 45 * time.Minute},
+	{template: "insurgency", boot: 45 * time.Minute},
+	// 8192 is ARK's own stated minimum; its 16384 recommendation is more than
+	// this host has, and Docker kills a container capped above available RAM.
+	{template: "ark-ascended", boot: 90 * time.Minute, memMB: 8192},
+	{template: "conan", boot: 60 * time.Minute},
+	{template: "cs2", boot: 60 * time.Minute},
+	{template: "squad", boot: 90 * time.Minute},
+}
+
+// TestHeavyGamesBoot is the same check for the tens-of-GB tier.
+func TestHeavyGamesBoot(t *testing.T) {
+	if os.Getenv(heavyGamesEnv) == "" {
+		t.Skipf("downloads tens of GB per game; set %s=1 to run", heavyGamesEnv)
+	}
+	bootGames(t, heavyGames)
 }
 
 // TestEasyGamesBoot creates each game through the real Manager and the real
@@ -144,7 +175,7 @@ func bootGames(t *testing.T, games []gameCase) {
 			ctx, cancel := context.WithTimeout(context.Background(), gc.boot+10*time.Minute)
 			defer cancel()
 
-			req := CreateRequest{TemplateID: gc.template, Name: "smoke", Variables: gc.vars}
+			req := CreateRequest{TemplateID: gc.template, Name: "smoke", Variables: gc.vars, MemoryMB: gc.memMB}
 			// Whatever else is on this machine is not the template's fault. A
 			// paused container still owns its host binding, so Minecraft's
 			// 25565 is routinely taken on a developer box and the run died at
