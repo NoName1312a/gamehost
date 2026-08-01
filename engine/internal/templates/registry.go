@@ -58,6 +58,13 @@ type Template struct {
 	// only as command-line arguments rather than environment variables. Entries
 	// may reference a variable as ${KEY}; see expandArgs in the server package
 	// for how a blank value is handled.
+	//
+	// What these mean depends on the image, and getting it wrong fails at
+	// `docker run` rather than in the game. With an ENTRYPOINT they are
+	// appended to it, so listing just the flag is right. With only a CMD they
+	// *replace* it, so the whole command has to be repeated — Eco's `-offline`
+	// alone was tried as the executable and produced "-offline: executable file
+	// not found in $PATH". Check `docker image inspect` before adding args.
 	Args []string `yaml:"args,omitempty" json:"args,omitempty"`
 }
 
