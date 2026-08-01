@@ -30,6 +30,14 @@ ports:
 env:
   PUID: "10000"
   PGID: "10000"
+  # Pin the ports the server listens on to the ones published above. The image
+  # defaults to GAME_PORT=27050 / QUERY_PORT=27051 and passes them straight to
+  # -Port / -QueryPort, so leaving these unset meant GameNest forwarded 8777 and
+  # 27015 while the server sat on 27050 and 27051: it ran, registered with the
+  # server list, and nobody could reach it. Setting them explicitly also stops
+  # the two drifting apart again if the image changes its defaults.
+  GAME_PORT: "8777"
+  QUERY_PORT: "27015"
 variables:
   - key: SERVER_NAME
     label: Server name
@@ -38,6 +46,15 @@ variables:
     required: false
   - key: SERVER_PASSWORD
     label: Server password
+    description: Leave blank for an open server
+    default: ""
+    type: string
+    required: false
+  # Without this the image falls back to "AdminPleaseChangeMe" and every server
+  # ships with the same published admin password.
+  - key: ADMIN_PASSWORD
+    label: Admin password
+    description: For in-game admin commands — change it from the default
     default: ""
     type: string
     required: false
