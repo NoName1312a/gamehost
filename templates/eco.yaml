@@ -4,7 +4,8 @@ game: eco
 category: Simulation
 description: >-
   Collaborative eco-civilization sim — build a society without wrecking the
-  ecosystem. Needs a free server token from play.eco.
+  ecosystem. Server settings, including the play.eco token that lists your
+  server publicly, live in Configs/Network.eco — edit it in the file manager.
 icon: eco
 steamAppId: 382310
 image: strangeloopgames/eco-game-server:latest
@@ -23,11 +24,15 @@ ports:
     container: 3001
     protocol: tcp
     default: 3001
+  # The image exposes 3002/tcp alongside the other two and the template did not
+  # publish it.
+  - name: web-alt
+    container: 3002
+    protocol: tcp
+    default: 3002
 env: {}
-variables:
-  - key: ECO_TOKEN
-    label: Eco server token
-    description: Required — create a server at play.eco to get a token
-    default: ""
-    type: string
-    required: true
+# ECO_TOKEN used to be here, marked required. The image never reads it — the
+# string appears nowhere in it — so the form demanded a value that did nothing
+# and the server was never listed publicly. Eco takes it from Configs/Network.eco
+# instead, which is reachable in the file manager.
+variables: []
