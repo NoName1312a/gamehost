@@ -19,10 +19,11 @@ ports:
     container: 7777
     protocol: udp
     default: 7777
-  - name: query
-    container: 27015
-    protocol: udp
-    default: 27015
+  # No query port. ARK Survival Ascended answers queries on the game port, and
+  # the image's launcher passes only -port and an RCON port — it never mentions
+  # one. A 90-minute run confirmed it: game and RCON bound throughout, 27015
+  # never. Publishing it forwarded a port nothing listens on and, when
+  # tunnelled, spent a relay proxy on it.
   - name: rcon
     container: 27020
     protocol: tcp
