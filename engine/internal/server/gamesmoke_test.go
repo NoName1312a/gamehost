@@ -40,6 +40,11 @@ type gameCase struct {
 	// recommendation exceeds what a test machine has — ARK asks for 16 GB, and
 	// a container capped above the host's RAM is killed rather than throttled.
 	memMB int
+	// envVars names environment variables whose values become template
+	// variables of the same name. Credentials belong here and not in vars: a
+	// third-party API key has no business in the source tree, and a case that
+	// needs one skips itself rather than failing when it is absent.
+	envVars []string
 }
 
 // easyGames are the templates that need no third-party account and fit
@@ -66,6 +71,14 @@ var easyGames = []gameCase{
 		template: "minecraft-modrinth",
 		vars:     map[string]string{"MODRINTH_MODPACK": "cobblemon-fabric", "MEMORY": "2G"},
 		boot:     15 * time.Minute, // fetches and installs the whole modpack first
+	},
+	{
+		// CurseForge refuses automated downloads without an API key, so this
+		// case is skipped unless one is supplied out of band.
+		template: "minecraft-curseforge",
+		vars:     map[string]string{"MEMORY": "2G"},
+		envVars:  []string{"CF_API_KEY", "CF_PAGE_URL"},
+		boot:     20 * time.Minute,
 	},
 }
 
@@ -175,7 +188,19 @@ func bootGames(t *testing.T, games []gameCase) {
 			ctx, cancel := context.WithTimeout(context.Background(), gc.boot+10*time.Minute)
 			defer cancel()
 
-			req := CreateRequest{TemplateID: gc.template, Name: "smoke", Variables: gc.vars, MemoryMB: gc.memMB}
+			vars := map[string]string{}
+			for k, v := range gc.vars {
+				vars[k] = v
+			}
+			for _, key := range gc.envVars {
+				v := os.Getenv(key)
+				if v == "" {
+					t.Skipf("%s needs %s in the environment; not set", gc.template, key)
+				}
+				vars[key] = v
+			}
+
+			req := CreateRequest{TemplateID: gc.template, Name: "smoke", Variables: vars, MemoryMB: gc.memMB}
 			// Whatever else is on this machine is not the template's fault. A
 			// paused container still owns its host binding, so Minecraft's
 			// 25565 is routinely taken on a developer box and the run died at
